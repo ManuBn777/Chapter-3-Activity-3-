@@ -35,6 +35,7 @@ Inicia el servidor de desarrollo:
 npm run dev
 ```
 
+
 Abre en el navegador la URL local que muestra Vite. Se necesita un navegador con WebGPU habilitado.
 
 ## Ejecutar
