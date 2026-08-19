@@ -118,6 +118,7 @@ async function main() {
   const setMode = (next) => {
     mode = next;
     const lab = mode === 'LAB';
+    document.body.classList.toggle('performance-mode', !lab);
     panel.setVisible(lab);
     axes.visible = lab;
     attractorHelper.visible = lab;
