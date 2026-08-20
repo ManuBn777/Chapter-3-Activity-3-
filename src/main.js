@@ -58,6 +58,20 @@ async function main() {
     new THREE.MeshBasicMaterial({ color: '#ffffff' })
   );
   scene.add(attractorHelper);
+
+  const performanceGuide = new THREE.Mesh(
+    new THREE.RingGeometry(0.13, 0.15, 48),
+    new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  performanceGuide.visible = false;
+  scene.add(performanceGuide);
+
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
@@ -75,6 +89,7 @@ async function main() {
     if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
       params.attractor.value.copy(hit);
       attractorHelper.position.copy(hit);
+      performanceGuide.position.copy(hit);
     }
   });
 
@@ -122,6 +137,7 @@ async function main() {
     panel.setVisible(lab);
     axes.visible = lab;
     attractorHelper.visible = lab;
+    performanceGuide.visible = !lab;
     //orbit.enabled = lab;
     hud.innerHTML = lab
       ? '<strong>LAB</strong> · P: performance · R: reset · 1–5: pruebas'
