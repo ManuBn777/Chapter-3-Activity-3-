@@ -62,7 +62,7 @@ function button(parent, label, onClick) {
   return b;
 }
 
-export function createLabPanel({ params, onReset, onPreset, onModeChange, onPauseChange }) {
+export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange, onPauseChange }) {
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
@@ -123,6 +123,7 @@ export function createLabPanel({ params, onReset, onPreset, onModeChange, onPaus
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
   button(actions, 'Reset', onReset);
+  button(actions, 'Golpe · B', onBeat);
   button(actions, 'Pausar / continuar', () => onPauseChange());
   button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 
