@@ -3,128 +3,42 @@ import { uniform } from 'three/tsl';
 
 export function createParameters() {
   return {
-
-    // ============================================================
-    // SIMULATION
-    // ============================================================
-
     dt: uniform(1 / 60),
     timeScale: uniform(1.0),
-
-    // Movimiento interno constante
-    initialSpeed: uniform(0.22),
-
-    maxSpeed: uniform(1.5),
-
+    initialSpeed: uniform(0.35),
+    maxSpeed: uniform(5.0),
     boundsSize: uniform(10.0),
-
     particleSize: uniform(0.035),
 
-
-    // ============================================================
-    // WIND
-    // ============================================================
-
     windEnabled: uniform(0.0),
-
-    wind: uniform(
-      new THREE.Vector3(
-        0.0,
-        0.0,
-        0.0
-      )
-    ),
-
-
-    // ============================================================
-    // RADIAL — SOLO ARENA
-    // ============================================================
+    wind: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
 
     radialEnabled: uniform(1.0),
-
-    attractor: uniform(
-      new THREE.Vector3(
-        0.0,
-        0.0,
-        0.0
-      )
-    ),
-
+    attractor: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
     radialStrength: uniform(2.2),
-
     softening: uniform(0.35),
 
-
-    // ============================================================
-    // ESTADOS
-    // ============================================================
-
-    // 0 = Arena
-    // 1 = Esfera
-
+    // Transición de estado (0.0 = Arena, 1.0 = Esfera)
     sphereBlend: uniform(1.0),
-
-    // Radio real de la esfera
-
     baseRadius: uniform(2.0),
 
-
-    // ============================================================
-    // B — THUMP
-    // ============================================================
-
-    /*
-     * Este NO es un bounce.
-     *
-     * Es un pulso extremadamente corto.
-     */
-
+    // B: Kick / Bounce
     beat: uniform(0.0),
+    beatExpansion: uniform(6.0),
+    beatStrength: uniform(25.0),
 
-    /*
-     * Cuánto se expande la esfera durante el kick.
-     *
-     * 0.20 = +20%
-     *
-     * Radio 2 → aproximadamente 2.4
-     *
-     * Esto es intencionalmente pequeño.
-     */
-
-    kickAmount: uniform(0.20),
-
-    /*
-     * Se conserva para el modo Arena.
-     */
-
-    beatStrength: uniform(8.0),
-
-
-    // ============================================================
-    // N — ESTÁTICA
-    // ============================================================
-
+    // N: Estática
     staticTrigger: uniform(0.0),
-
     staticStrength: uniform(6.0),
 
-
-    // ============================================================
-    // VÓRTICE
-    // ============================================================
+    // Controles de Órbita y Giro (Q/W y A/S)
+    spinDirection: uniform(1.0), // 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
+    spinSpeed: uniform(1.5),     // Velocidad orbital ajustable (A/S)
 
     vortexEnabled: uniform(1.0),
-
     vortexStrength: uniform(1.4),
 
-
-    // ============================================================
-    // DRAG
-    // ============================================================
-
     dragEnabled: uniform(1.0),
-
-    dragCoefficient: uniform(0.035)
-
+    dragCoefficient: uniform(0.12)
   };
 }
