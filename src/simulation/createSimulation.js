@@ -64,30 +64,34 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-// 2) MODO ESFERA: Estilo "Orbe Vivo" (Influencia H.A.Y)
+// 2) MODO ESFERA: Comportamiento mecánico estilo NCS
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
+    
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // A. ROTACIÓN ORBITAL (El giro suave de la esfera)
-      // Usamos el producto cruz para orbitar alrededor del eje Z
-      const orbitalForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.8); 
-      force.addAssign(orbitalForce.mul(params.sphereBlend));
+      // A. ROTACIÓN: Movimiento base (fluidez)
+      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.5);
+      force.addAssign(rotation.mul(params.sphereBlend));
 
-      // B. REBOTE ELÁSTICO AGRESIVO (El "Pop" del beat)
-      // Si se alejan, las empujamos con muchísima fuerza hacia el centro
+      // B. EL "KICK" MECÁNICO (La clave del bounce del video)
+      // Si el beat es alto, empujamos las partículas hacia afuera activamente, 
+      // creando la expansión que ves en el video.
+      const beatPush = p.normalize().mul(params.beat.mul(400.0));
+      force.addAssign(beatPush.mul(params.sphereBlend));
+
+      // C. PARED DE REBOTE (El límite sólido)
       If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const diff = distFromCenter.sub(effectiveRadius);
-        // Multiplicador alto (1500.0) para que sea un rebote seco y sólido
-        const pushIn = p.normalize().negate().mul(diff.mul(1500.0)).mul(params.sphereBlend);
-        force.addAssign(pushIn);
+        // Al tocar el límite, invertimos la velocidad con un factor de restitución
+        // Esto crea el efecto de "choque" contra una pared invisible
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius).mul(2000.0));
+        force.addAssign(pushIn.mul(params.sphereBlend));
         
-        // Fricción al chocar: disipa energía para que no se vuelvan locas
-        v.mulAssign(0.2); 
+        // FRENADO BRUSCO: Esto es lo que hace que parezca una pared sólida
+        v.assign(v.mul(-0.3)); 
       });
       
-      // C. ATRACCIÓN SUAVE AL CENTRO (Mantiene la forma esférica)
-      // Mantiene la densidad de la esfera alta, como en el video
-      const centerPull = p.negate().mul(0.5).mul(params.sphereBlend);
-      force.addAssign(centerPull);
+      // D. COMPRESIÓN: Si el beat es 0, las partículas vuelven al centro suavemente
+      const contraction = p.negate().mul(params.beat.oneMinus().mul(2.0));
+      force.addAssign(contraction.mul(params.sphereBlend));
     });
 
     // 3) MODO ARENA: Onda de choque clásica independiente del mouse
