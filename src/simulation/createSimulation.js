@@ -29,14 +29,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
+    const r4 = hash(i.add(uint(53)));
+    const r5 = hash(i.add(uint(71)));
+    const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica real en 3D (rellena todo el volumen interior)
+    // Distribución esférica volumétrica inicial en 3D
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(0.0)); // Velocidad inicial absolutamente en cero (quieta)
+    // Velocidad inicial suave para que comiencen a moverse de inmediato
+    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -48,26 +52,36 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-    // MODO ESFERA QUIETA Y ESTÁTICA
+    // MODO ESFERA CON MOVIMIENTO INTERNO FLUIDO
     If(params.sphereBlend.greaterThan(0.01), () => {
       
-      // 1. Si se pulsa el beat, da un pequeño impulso de expansión hacia afuera y regresa
+      // 1. FLUJO INTERNO TRIDIMENSIONAL (Movimiento orgánico tipo fluido dentro de la esfera)
+      const internalFlow = vec3(
+        sin(p.y.mul(2.0)),
+        sin(p.z.mul(2.0)),
+        sin(p.x.mul(2.0))
+      ).mul(1.5);
+      force.addAssign(internalFlow.mul(params.sphereBlend));
+
+      // 2. IMPULSO DEL BEAT (Expansión dinámica cuando se activa)
       If(params.beat.greaterThan(0.01), () => {
         const beatImpulse = p.normalize().mul(params.beat.mul(params.beatExpansion));
         force.addAssign(beatImpulse.mul(params.sphereBlend));
       });
 
-      // 2. Mantener la estructura esférica firme sin dejar que las partículas se dispersen
+      // 3. CONTENCIÓN SUAVE (Fuerza elástica de rebote que evita que salgan de la esfera)
       If(distFromCenter.greaterThan(params.baseRadius), () => {
         const diff = distFromCenter.sub(params.baseRadius);
-        force.addAssign(p.normalize().negate().mul(diff.mul(100.0)).mul(params.sphereBlend));
+        // Empuja hacia el centro y frena la velocidad hacia afuera para crear un rebote suave
+        force.addAssign(p.normalize().negate().mul(diff.mul(80.0)).mul(params.sphereBlend));
+        v.assign(v.mul(0.85)); // Amortiguación en el borde
       });
 
-      // 3. Fricción total altísima para anular cualquier inercia residual (mantiene la esfera totalmente quieta)
-      force.addAssign(v.mul(-25.0).mul(params.sphereBlend));
+      // 4. FRICCIÓN LEVE (Permite que floten con inercia sin acelerarse infinitamente)
+      force.addAssign(v.mul(-0.8).mul(params.sphereBlend));
     });
 
-    // MODO ARENA (Comportamiento dinámico alternativo cuando sphereBlend es 0)
+    // MODO ARENA (Comportamiento alternativo cuando sphereBlend es 0)
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
       const waveRadius = params.beat.mul(6.0);
@@ -84,6 +98,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     // Integración de movimiento
     v.addAssign(force.mul(dt));
+
+    // Limitar la velocidad máxima para mantener estabilidad
+    const speed = v.length();
+    If(speed.greaterThan(params.maxSpeed), () => {
+      v.assign(v.normalize().mul(params.maxSpeed));
+    });
+
     p.addAssign(v.mul(dt));
 
     // Límites periódicos solo en modo arena
