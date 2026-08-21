@@ -36,7 +36,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(0.0)); // Nacen completamente quietas
+    v.assign(vec3(0.0));
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -51,18 +51,15 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 1) MODO ESFERA (Estática con retorno elástico al tamaño original)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Radio objetivo dinámico que se expande con el beat (B) y regresa a baseRadius
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
       
       const toCenterDir = p.normalize();
       const currentRadius = distFromCenter;
       
-      // Fuerza elástica pura hacia el radio objetivo (mantiene la esfera firme y la regresa a su tamaño)
       const radiusDiff = currentRadius.sub(targetRadius);
       const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(120.0));
       force.addAssign(elasticForce.mul(params.sphereBlend));
 
-      // Fricción alta para anular inercias flotantes y mantenerla estable cuando no hay beat
       force.addAssign(v.mul(-15.0).mul(params.sphereBlend));
     });
 
@@ -92,7 +89,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / SHOCKWAVE (Solo para modo arena si se requiere onda libre)
+    // 3) BOTÓN B: KICK / SHOCKWAVE (Modo arena)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       If(params.sphereBlend.lessThan(0.5), () => {
@@ -124,7 +121,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // INTEGRACIÓN Y LÍMITES
+    // INTEGRACIÓN Y LÍMITES DEL CUBO
     // ==========================================
     v.addAssign(force.mul(dt));
 
@@ -135,6 +132,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
+    // Aplicación de los límites del cubo (boundsSize) compartidos con tu otro modo
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
