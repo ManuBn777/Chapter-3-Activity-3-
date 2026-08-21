@@ -20,10 +20,9 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-// B triggers this short manual outward pulse.
+    // B triggers this short manual outward pulse (Thump).
     beat: uniform(0.0),
-    beatStrength: uniform(6.0),
-    beatSpring: uniform(3.5),   // <--- AQUÍ LO AÑADES
+    beatStrength: uniform(8.0), // Fuerza con la que se expande el golpe
 
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
