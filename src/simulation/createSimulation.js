@@ -70,7 +70,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     // 3) MANUAL BEAT: temporary repulsion from the attractor.
     // When it fades, the normal radial attraction and drag take over again.
-    force.addAssign(radialDirection.mul(-params.beatStrength).mul(params.beat));
+    force.addAssign(
+      radialDirection.mul(params.beatStrength).mul(-1.0).mul(params.beat)
+    );
 
     // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
