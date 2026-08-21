@@ -68,18 +68,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) THUMP / BOMBOKICK (Onda de choque radial):
-    // Creamos un pulso en forma de anillo que empuja con fuerza hacia afuera 
-    // basándose en qué tan cerca/lejos está la partícula del centro, simulando el golpe seco.
-    // Usamos una función de campana/impulso para que afecte un frente de onda que se desplaza.
-    const waveFront = distance.sub(params.beat.mul(4.0)).abs(); // Anillo que se expande
-    const kickImpulse = radialDirection
-      .mul(params.beatStrength)
-      .mul(-1.0)
-      .mul(params.beat)
-      .div(waveFront.add(0.5)); // Más fuerte en el frente de la onda
+    // 3) THUMP / GLOBAL CONTAINER KICK:
+    // Generamos un desplazamiento global basado en hash/índice combinado con el beat,
+    // haciendo que toda la caja/nube de partículas sufra una sacudida coherente y seca 
+    // (como el impacto físico de un bombo pegando en el recinto).
+    const shakeNoise = vec3(
+      hash(instanceIndex.add(uint(1))),
+      hash(instanceIndex.add(uint(2))),
+      hash(instanceIndex.add(uint(3)))
+    ).sub(0.5);
 
-    force.addAssign(kickImpulse);
+    const globalKick = shakeNoise.mul(params.beatStrength).mul(params.beat);
+    force.addAssign(globalKick);
 
     // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
