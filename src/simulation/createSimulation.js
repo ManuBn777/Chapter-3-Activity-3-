@@ -61,25 +61,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) ESTADO ESFERA ESTÁTICO (Contenedor firme sin temblores)
+    // 3) ESFERA CONTENEDORA + BOUNCE DEL KICK (El radio pasa de baseRadius a baseRadius + beatExpansion)
     const distFromCenter = p.length();
+    const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
+    
     If(params.sphereBlend.greaterThan(0.01), () => {
-      If(distFromCenter.greaterThan(params.containerRadius), () => {
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(80.0).mul(params.sphereBlend);
+      If(distFromCenter.greaterThan(effectiveRadius), () => {
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius)).mul(120.0).mul(params.sphereBlend);
         force.addAssign(pushIn);
       });
     });
 
-    // 4) KICK / BOUNCE (Tecla B): Ataque contundente, rápido y elástico
-    const waveRadius = params.beat.mul(7.0);
-    const waveBand = distFromCenter.sub(waveRadius).abs();
-    const bounceShockwave = p.normalize()
-      .mul(params.beatStrength)
-      .mul(params.beat)
-      .div(waveBand.add(0.15));
-    force.addAssign(bounceShockwave);
-
-    // 5) ESTÁTICA / ARENA (Tecla N): Dispersión
+    // 4) ESTÁTICA / ARENA (Tecla N): Dispersión
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
@@ -94,13 +87,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       
     force.addAssign(staticEffect);
 
-    // 6) VORTEX FORCE
+    // 5) VORTEX FORCE
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 7) LINEAR DRAG (Más amortiguación en modo esfera para mantener la inercia limpia)
-    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(3.0), params.sphereBlend);
+    // 6) LINEAR DRAG (Mayor amortiguación en la esfera para mantener la inercia limpia)
+    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(3.5), params.sphereBlend);
     force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
     // INTEGRATION
@@ -113,7 +106,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // 8) LÍMITES PERIÓDICOS (Se atenúan o desactivan fluidamente cuando entra la esfera)
+    // 7) LÍMITES PERIÓDICOS (Arena libre)
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
