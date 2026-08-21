@@ -66,6 +66,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     );
 
     const toAttractor = effectiveAttractor.sub(p);
+
     const distance = max(
       toAttractor.length(),
       params.softening
@@ -87,10 +88,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 2) MODO ESFERA
     // ============================================================
 
-    // El radio puede crecer temporalmente cuando beat > 0.
-    // baseRadius = 2
-    // beatExpansion = 6
-    // beat = 1 → radio máximo ≈ 8
     const effectiveRadius = params.baseRadius.add(
       params.beat.mul(params.beatExpansion)
     );
@@ -114,23 +111,21 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // ----------------------------------------------------------
-      // B. KICK / BOUNCE
+      // B. KICK / BOUNCE SUAVE
       // ----------------------------------------------------------
 
       If(params.beat.greaterThan(0.01), () => {
 
         /*
-         * El beat produce un impulso hacia afuera.
-         *
-         * Esto hace que las partículas acompañen
-         * la expansión de la esfera en lugar de
-         * quedarse completamente estáticas mientras
-         * cambia el radio.
+         * El beat acompaña la expansión de la esfera,
+         * pero con una fuerza reducida para evitar
+         * que las partículas salgan disparadas.
          */
         const beatImpulse = p
           .normalize()
           .mul(params.beat)
-          .mul(params.beatStrength);
+          .mul(params.beatStrength)
+          .mul(0.25);
 
         force.addAssign(
           beatImpulse.mul(params.sphereBlend)
@@ -141,13 +136,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // C. CONTENCIÓN ELÁSTICA EXTERIOR
       // ----------------------------------------------------------
 
-      /*
-       * Si una partícula supera el radio actual,
-       * aparece una fuerza hacia el centro.
-       *
-       * Esto mantiene la forma esférica y permite
-       * que exista un pequeño halo durante el bounce.
-       */
       If(distFromCenter.greaterThan(effectiveRadius), () => {
 
         const distanceDiff = distFromCenter.sub(
@@ -172,10 +160,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // D. CONTENCIÓN SUAVE INTERIOR
       // ----------------------------------------------------------
 
-      /*
-       * Evita que demasiadas partículas se acumulen
-       * completamente en el centro.
-       */
       If(
         distFromCenter.lessThan(
           params.baseRadius.mul(0.5)
@@ -269,10 +253,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 6) DRAG
     // ============================================================
 
-    /*
-     * En esfera usamos un drag algo mayor para evitar
-     * que las partículas se disparen y pierdan la forma.
-     */
     const effectiveDrag = mix(
       params.dragCoefficient,
       params.dragCoefficient.mul(4.5),
@@ -294,7 +274,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       force.mul(dt)
     );
 
-    // Limitar velocidad máxima
     const speed = v.length();
 
     If(speed.greaterThan(params.maxSpeed), () => {
@@ -303,7 +282,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
     });
 
-    // Actualizar posición
     p.addAssign(
       v.mul(dt)
     );
@@ -312,10 +290,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 7) LÍMITES PERIÓDICOS
     // ============================================================
 
-    /*
-     * En arena las partículas pueden envolver los límites.
-     * En esfera mantenemos la posición normal.
-     */
     const half = params.boundsSize.mul(0.5);
 
     const wrappedPos = mod(
