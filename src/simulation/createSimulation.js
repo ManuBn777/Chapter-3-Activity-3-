@@ -52,10 +52,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Olas fluidas + Expansión por Beat + Giro Q/W)
+    // 1) MODO ESFERA (Intacto y perfecto)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // 1. Patrón de ondas fluidas constante
+      // Patrón de ondas fluidas constante
       const waveFlow = vec3(
         sin(p.y.mul(2.0).add(params.beat.mul(5.0))),
         sin(p.z.mul(2.0).add(params.beat.mul(5.0))),
@@ -63,28 +63,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       ).mul(4.0);
       force.addAssign(waveFlow.mul(params.sphereBlend));
 
-      // 2. Control de giro con Q (izquierda) y W (derecha) alrededor del eje Y
-      // params.spinDirection asume valores negativos para Q e positivos para W (o viceversa según se configure)
+      // Control de giro con Q y W
       const rotationAxis = vec3(0.0, 1.0, 0.0);
       const tangentDir = rotationAxis.cross(p);
       const spinForce = tangentDir.mul(params.spinDirection).mul(3.0);
       force.addAssign(spinForce.mul(params.sphereBlend));
 
-      // 3. Radio objetivo que se expande suavemente con B
+      // Radio objetivo y contención elástica suave
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
       const toCenterDir = p.normalize();
       const radiusDiff = distFromCenter.sub(targetRadius);
-      
-      // Fuerza de contención elástica suave
       const containmentForce = toCenterDir.negate().mul(radiusDiff.mul(8.0));
       force.addAssign(containmentForce.mul(params.sphereBlend));
 
-      // Fricción baja para conservar fluidez e inercia de giro
       force.addAssign(v.mul(-0.2).mul(params.sphereBlend));
     });
 
     // ==========================================
-    // 2) MODO ARENA (Comportamiento fluido original)
+    // 2) MODO ARENA (¡CON POTENCIA MULTIPLICADA!)
     // ==========================================
     If(params.sphereBlend.lessThan(0.99), () => {
       const effectiveAttractor = params.attractor;
@@ -92,34 +88,39 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const distance = max(toAttractor.length(), params.softening);
       const radialDirection = toAttractor.div(distance);
       
+      // Multiplicamos por 3.0 para darles mucha más fuerza y presencia
       const radialForce = radialDirection
         .mul(params.radialStrength)
         .div(distance.pow(2))
-        .mul(params.radialEnabled);
+        .mul(params.radialEnabled)
+        .mul(3.0);
         
       force.addAssign(radialForce.mul(params.sphereBlend.oneMinus()));
 
-      force.addAssign(params.wind.mul(params.windEnabled).mul(params.sphereBlend.oneMinus()));
+      // Viento con mayor impacto
+      force.addAssign(params.wind.mul(params.windEnabled).mul(3.0).mul(params.sphereBlend.oneMinus()));
 
+      // Vórtice más potente
       const zAxis = vec3(0.0, 0.0, 1.0);
       const tangent = zAxis.cross(radialDirection);
-      force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled).mul(params.sphereBlend.oneMinus()));
+      force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled).mul(3.0).mul(params.sphereBlend.oneMinus()));
 
       force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0).mul(params.sphereBlend.oneMinus()));
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / SHOCKWAVE (Modo arena)
+    // 3) BOTÓN B: KICK / SHOCKWAVE (Modo arena con más potencia)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       If(params.sphereBlend.lessThan(0.5), () => {
         const centerDir = p.normalize();
         const waveRadius = params.beat.mul(25.0);
         const waveBand = distFromCenter.sub(waveRadius).abs();
+        // Onda expansiva de impacto con mayor fuerza
         const arenaShockwave = centerDir
           .mul(params.beatStrength)
           .mul(params.beat)
-          .mul(20.0)
+          .mul(50.0)
           .div(waveBand.add(0.1));
         
         force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
