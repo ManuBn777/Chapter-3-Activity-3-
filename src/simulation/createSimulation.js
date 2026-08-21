@@ -68,13 +68,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-// 3) MANUAL BEAT: temporary repulsion from the attractor (Thump).
-    const thumpForce = radialDirection
-      .mul(params.beatStrength)
-      .mul(-1.0)
-      .mul(params.beat);
-    
-    force.addAssign(thumpForce);
+    // 3) THUMP / MANUAL BEAT: Expansión rápida hacia afuera y retorno elástico inmediato.
+    // Empuja radialmente hacia afuera multiplicado por el beat, y aplica un resorte fuerte de regreso al centro.
+    const thumpRepulsion = radialDirection.mul(params.beatStrength).mul(-1.0).mul(params.beat);
+    const springReturn = toAttractor.mul(params.beat.mul(6.0));
+    force.addAssign(thumpRepulsion.add(springReturn));
 
     // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
