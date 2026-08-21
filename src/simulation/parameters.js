@@ -18,18 +18,22 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // Transición de estado (0.0 = Arena fluida, 1.0 = Esfera)
+    // Transición de estado (0.0 = Arena, 1.0 = Esfera)
     sphereBlend: uniform(1.0),
     baseRadius: uniform(2.0),
 
-    // B: Kick / Bounce masivo en la esfera (de 2 a 8) y onda en arena
+    // B: Kick / Bounce
     beat: uniform(0.0),
-    beatExpansion: uniform(6.0), // 2.0 base + 6.0 = 8.0 de radio máximo en el golpe
+    beatExpansion: uniform(6.0),
     beatStrength: uniform(25.0),
 
     // N: Estática
     staticTrigger: uniform(0.0),
     staticStrength: uniform(6.0),
+
+    // Controles de Órbita y Giro (Q/W y A/S)
+    spinDirection: uniform(1.0), // 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
+    spinSpeed: uniform(1.5),     // Velocidad orbital ajustable (A/S)
 
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
