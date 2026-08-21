@@ -157,7 +157,7 @@ async function main() {
     const delta = Math.min(clock.getDelta(), 0.05);
 
     params.sphereBlend.value += (targetSphereBlend - params.sphereBlend.value) * Math.min(1.0, delta * 4.0);
-    params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
+    params.beat.value = Math.max(0, params.beat.value - delta * params.beatDecay.value);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
