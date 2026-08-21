@@ -21,28 +21,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-  const initParticles = Fn(() => {
+const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
     const v = velocityBuffer.element(i);
 
-    const r1 = hash(i.add(uint(11))); // Para el ángulo theta [0, 2*PI]
-    const r2 = hash(i.add(uint(23))); // Para el coseno de phi [-1, 1]
-    const r3 = hash(i.add(uint(37))); // Para la distribución del radio (volumétrica)
+    const r1 = hash(i.add(uint(11)));
+    const r2 = hash(i.add(uint(23)));
+    const r3 = hash(i.add(uint(37)));
     const r4 = hash(i.add(uint(53)));
     const r5 = hash(i.add(uint(71)));
     const r6 = hash(i.add(uint(89)));
+    const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica real (evita que se aplaste en un anillo 2D)
-    const theta = r1.mul(6.28318530718); // 2 * PI
-    const phi = r2.mul(2.0).sub(1.0).acos(); // Ángulo cenital seguro [-1, 1] -> [0, PI]
-    const radius = r3.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
+    // Distribución volumétrica uniforme en esfera 3D basada en dirección aleatoria y raíz cúbica del radio
+    const dir = vec3(r1, r2, r3).sub(0.5).normalize();
+    const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
-    const x = radius.mul(phi.sin()).mul(theta.cos());
-    const y = radius.mul(phi.sin()).mul(theta.sin());
-    const z = radius.mul(phi.cos());
-
-    p.assign(vec3(x, y, z));
+    p.assign(dir.mul(radius));
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
