@@ -64,17 +64,26 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-    // 2) MODO ESFERA ESTÁTICA + KICK (B) QUE EXPANDE DE 2 A 8
+// 2) MODO ESFERA: Pared contenedora exagerada y "elástica"
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Inercia circular interna muy suave
+      // Inercia circular interna
       const inertiaForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.35);
       force.addAssign(inertiaForce.mul(params.sphereBlend));
 
-      // Pared contenedora fija en (0,0,0)
+      // CORRECCIÓN: Pared mucho más agresiva
+      // Aumentamos el multiplicador de 180.0 a 1200.0 para un rebote tipo "cápsula rígida"
+      // También añadimos un pequeño boost extra basado en la velocidad actual para que se sientan "pesadas"
       If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius)).mul(180.0).mul(params.sphereBlend);
+        const penetration = distFromCenter.sub(effectiveRadius);
+        const pushIn = p.normalize().negate()
+          .mul(penetration.mul(1200.0)) // Aumentado significativamente
+          .mul(params.sphereBlend);
+        
         force.addAssign(pushIn);
+        
+        // Efecto secundario: frenado brusco al chocar para que el rebote sea más "seco"
+        v.mulAssign(0.5); 
       });
     });
 
