@@ -14,7 +14,8 @@ import {
   uv,
   vec3,
   vec4,
-  sin
+  sin,
+  length
 } from 'three/tsl';
 
 export function createSimulation({
@@ -48,10 +49,6 @@ export function createSimulation({
     const v =
       velocityBuffer.element(i);
 
-    // ----------------------------------------------------------
-    // RANDOM VALUES
-    // ----------------------------------------------------------
-
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
@@ -62,26 +59,10 @@ export function createSimulation({
 
     const r7 = hash(i.add(uint(107)));
 
-    // ----------------------------------------------------------
-    // DISTRIBUCIÓN VOLUMÉTRICA
-    // ----------------------------------------------------------
-
-    /*
-     * Dirección aleatoria.
-     */
     const direction =
       vec3(r1, r2, r3)
         .sub(0.5)
         .normalize();
-
-    /*
-     * IMPORTANTE:
-     *
-     * r^(1/3) produce una distribución uniforme
-     * dentro del volumen de una esfera.
-     *
-     * Las partículas NO se colocan sobre la superficie.
-     */
 
     const radius =
       r7
@@ -92,15 +73,6 @@ export function createSimulation({
       direction.mul(radius)
     );
 
-    // ----------------------------------------------------------
-    // VELOCIDAD INICIAL
-    // ----------------------------------------------------------
-
-    /*
-     * Movimiento inicial pequeño y aleatorio.
-     *
-     * No queremos que salgan disparadas.
-     */
     v.assign(
       vec3(r4, r5, r6)
         .sub(0.5)
@@ -132,10 +104,6 @@ export function createSimulation({
     const force =
       vec3(0.0).toVar();
 
-    // ==========================================================
-    // INFORMACIÓN DE POSICIÓN
-    // ==========================================================
-
     const dist =
       max(
         p.length(),
@@ -148,18 +116,6 @@ export function createSimulation({
     // ==========================================================
     // 1. MOVIMIENTO INTERNO
     // ==========================================================
-
-    /*
-     * En lugar de una fuerza radial, usamos un campo
-     * tridimensional de movimiento.
-     *
-     * Esto hace que las partículas circulen dentro
-     * de la esfera sin ser empujadas hacia la superficie.
-     *
-     * MUY IMPORTANTE:
-     *
-     * No modifica el radio directamente.
-     */
 
     const internalFlow =
       vec3(
@@ -175,7 +131,7 @@ export function createSimulation({
     );
 
     // ==========================================================
-    // 2. PEQUEÑO MOVIMIENTO VERTICAL / PROFUNDIDAD
+    // 2. PROFUNDIDAD / FLUJO
     // ==========================================================
 
     const depthFlow =
@@ -195,51 +151,15 @@ export function createSimulation({
     // 3. B — THUMP
     // ==========================================================
 
-    /*
-     * NO HAY:
-     *
-     * - bounce
-     * - spring
-     * - elastic force
-     * - secondary bounce
-     * - impulso radial acumulativo
-     *
-     * El B simplemente expande temporalmente las posiciones.
-     *
-     * El valor beat viene de main.js y dura muy poco.
-     */
-
     If(
       params.beat.greaterThan(0.001),
       () => {
-
-        /*
-         * Expansión corta.
-         *
-         * beat = 0
-         *      ↓
-         * escala = 1
-         *
-         * beat = 1
-         *      ↓
-         * escala = 1 + kickAmount
-         */
-
         const kickScale =
           vec3(1.0).add(
             params.beat.mul(
               params.kickAmount
             )
           );
-
-        /*
-         * Expandimos cada partícula desde el centro.
-         *
-         * Esto mantiene la forma esférica.
-         *
-         * NO crea una onda que empuje las partículas
-         * hacia la superficie.
-         */
 
         p.assign(
           p.mul(
@@ -250,21 +170,12 @@ export function createSimulation({
             )
           )
         );
-
       }
     );
 
     // ==========================================================
     // 4. CONTENCIÓN SUAVE
     // ==========================================================
-
-    /*
-     * Solamente evitamos que una partícula se vaya
-     * completamente fuera de la esfera.
-     *
-     * NO existe una fuerza que atraiga todas las partículas
-     * hacia el borde.
-     */
 
     const maxRadius =
       params.baseRadius
@@ -273,195 +184,29 @@ export function createSimulation({
     If(
       dist.greaterThan(maxRadius),
       () => {
-
-        const excess =
-          dist.sub(maxRadius);
-
-        const correction =
-          normal
-            .negate()
-            .mul(excess)
-            .mul(4.0);
-
-        force.addAssign(
-          correction
-            .mul(params.sphereBlend)
-        );
-
+        const excess = dist.sub(maxRadius);
+        force.subAssign(normal.mul(excess.mul(4.0)));
       }
     );
 
     // ==========================================================
-    // 5. ESTÁTICA / N
+    // 5. INTEGRACIÓN DE VELOCIDAD Y POSICIÓN
     // ==========================================================
 
-    const randomScatter =
-      vec3(
-        hash(i.add(uint(13))),
-        hash(i.add(uint(23))),
-        hash(i.add(uint(37)))
-      )
-      .sub(0.5);
+    // Aplicar fuerza a la velocidad
+    v.addAssign(force.mul(dt));
 
-    const ripple =
-      sin(
-        dist.mul(25.0)
-      );
+    // Aplicar resistencia del aire (drag) simple
+    v.assign(v.mul(0.98));
 
-    const staticEffect =
-      randomScatter
-        .mul(params.staticStrength)
-        .add(
-          normal
-            .mul(ripple)
-            .mul(2.0)
-        )
-        .mul(params.staticTrigger);
+    // Limitar velocidad máxima
+    const speed = v.length();
+    If(speed.greaterThan(params.maxSpeed), () => {
+      v.assign(v.normalize().mul(params.maxSpeed));
+    });
 
-    force.addAssign(
-      staticEffect
-    );
-
-    // ==========================================================
-    // 6. ARENA
-    // ==========================================================
-
-    If(
-      params.sphereBlend.lessThan(0.99),
-      () => {
-
-        // ------------------------------------------------------
-        // RADIAL MOUSE
-        // ------------------------------------------------------
-
-        const effectiveAttractor =
-          params.attractor;
-
-        const toAttractor =
-          effectiveAttractor.sub(p);
-
-        const distance =
-          max(
-            toAttractor.length(),
-            params.softening
-          );
-
-        const attractDirection =
-          toAttractor.div(distance);
-
-        const radialForce =
-          attractDirection
-            .mul(params.radialStrength)
-            .div(distance.pow(2))
-            .mul(params.radialEnabled);
-
-        force.addAssign(
-          radialForce
-            .mul(params.sphereBlend.oneMinus())
-        );
-
-        // ------------------------------------------------------
-        // VORTEX
-        // ------------------------------------------------------
-
-        const zAxis =
-          vec3(0.0, 0.0, 1.0);
-
-        const tangent =
-          zAxis.cross(
-            attractDirection
-          );
-
-        force.addAssign(
-          tangent
-            .mul(params.vortexStrength)
-            .mul(params.vortexEnabled)
-            .mul(params.sphereBlend.oneMinus())
-        );
-
-        // ------------------------------------------------------
-        // WIND
-        // ------------------------------------------------------
-
-        force.addAssign(
-          params.wind
-            .mul(params.windEnabled)
-            .mul(params.sphereBlend.oneMinus())
-        );
-
-      }
-    );
-
-    // ==========================================================
-    // 7. DRAG
-    // ==========================================================
-
-    force.addAssign(
-      v
-        .mul(params.dragCoefficient)
-        .mul(params.dragEnabled)
-        .mul(-1.0)
-    );
-
-    // ==========================================================
-    // 8. INTEGRATION
-    // ==========================================================
-
-    v.addAssign(
-      force.mul(dt)
-    );
-
-    // ==========================================================
-    // VELOCIDAD MÁXIMA
-    // ==========================================================
-
-    const speed =
-      v.length();
-
-    If(
-      speed.greaterThan(
-        params.maxSpeed
-      ),
-      () => {
-
-        v.assign(
-          v
-            .normalize()
-            .mul(params.maxSpeed)
-        );
-
-      }
-    );
-
-    // ==========================================================
-    // POSICIÓN
-    // ==========================================================
-
-    p.addAssign(
-      v.mul(dt)
-    );
-
-    // ==========================================================
-    // ARENA — WRAP
-    // ==========================================================
-
-    const half =
-      params.boundsSize.mul(0.5);
-
-    const wrapped =
-      mod(
-        p.add(half),
-        params.boundsSize
-      )
-      .sub(half);
-
-    p.assign(
-      mix(
-        wrapped,
-        p,
-        params.sphereBlend
-      )
-    );
+    // Actualizar posición final
+    p.addAssign(v.mul(dt));
 
   })()
     .compute(count)
@@ -469,124 +214,51 @@ export function createSimulation({
 
 
   // ============================================================
-  // MATERIAL
+  // RENDER MESH / POINTS SETUP
   // ============================================================
 
-  const material =
-    new THREE.SpriteNodeMaterial({
-      blending:
-        THREE.AdditiveBlending,
+  const particleGeometry = new THREE.BufferGeometry();
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
 
-      depthWrite: false,
+  const particleMaterial = new THREE.SpriteNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
 
-      transparent: true
-    });
+  // Conectar el buffer de computación GPU directamente al nodo de posición del material
+  particleMaterial.positionNode = positionBuffer.element(instanceIndex);
+  
+  // Tamaño de las partículas desde los parámetros
+  particleMaterial.scaleNode = params.particleSize;
 
-  material.positionNode =
-    positionBuffer.toAttribute();
+  // Color basado en la velocidad o estado base
+  const particleColor = mix(
+    color('#4fc3f7'),
+    color('#ff8a80'),
+    velocityBuffer.element(instanceIndex).length().div(params.maxSpeed)
+  );
+  particleMaterial.colorNode = particleColor;
 
-  material.scaleNode =
-    params.particleSize;
-
-  material.colorNode =
-    Fn(() => {
-
-      const speed =
-        velocityBuffer
-          .toAttribute()
-          .length();
-
-      const t =
-        speed
-          .div(params.maxSpeed)
-          .clamp(0.0, 1.0);
-
-      const slow =
-        color('#46a6ff');
-
-      const fast =
-        color('#ffb35a');
-
-      return vec4(
-        mix(
-          slow,
-          fast,
-          t
-        ),
-        1.0
-      );
-
-    })();
-
-  material.opacityNode =
-    step(
-      uv()
-        .xy
-        .sub(0.5)
-        .length(),
-      0.5
-    );
+  const particleMesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    particleMaterial,
+    count
+  );
+  
+  scene.add(particleMesh);
 
 
   // ============================================================
-  // MESH
+  // SIMULATION CONTROLS API
   // ============================================================
-
-  const geometry =
-    new THREE.PlaneGeometry(
-      1,
-      1
-    );
-
-  const mesh =
-    new THREE.InstancedMesh(
-      geometry,
-      material,
-      count
-    );
-
-  mesh.frustumCulled = false;
-
-  scene.add(mesh);
-
-
-  // ============================================================
-  // CONTROLS
-  // ============================================================
-
-  function reset() {
-
-    renderer.compute(
-      initParticles
-    );
-
-  }
-
-  function stepSimulation() {
-
-    renderer.compute(
-      updateParticles
-    );
-
-  }
-
-  function dispose() {
-
-    geometry.dispose();
-
-    material.dispose();
-
-    scene.remove(mesh);
-
-  }
-
 
   return {
-    count,
-    positionBuffer,
-    velocityBuffer,
-    reset,
-    stepSimulation,
-    dispose
+    reset() {
+      renderer.compute(initParticles);
+    },
+    stepSimulation() {
+      renderer.compute(updateParticles);
+    }
   };
 }
