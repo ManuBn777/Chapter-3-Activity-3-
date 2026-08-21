@@ -1,36 +1,45 @@
-+import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import * as THREE from 'three/webgpu';
+
 export function createParameters() {
   return {
-    dt: uniform(1 / 60),
-    timeScale: uniform(1.0),
-    initialSpeed: uniform(0.35),
-    maxSpeed: uniform(5.0),
-    boundsSize: uniform(10.0),
-    particleSize: uniform(0.035),
-    windEnabled: uniform(0.0),
-    wind: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    radialEnabled: uniform(1.0),
-    attractor: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    radialStrength: uniform(2.2),
-    softening: uniform(0.35),
-    // Transición de estado (0.0 = Arena, 1.0 = Esfera)
-    sphereBlend: uniform(1.0),
-    baseRadius: uniform(2.0),
-    // B: Kick / Bounce
-    beat: uniform(0.0),
-    beatExpansion: uniform(6.0),
-    beatStrength: uniform(25.0),
-    beatDecay: uniform(1.2),
-    // N: Estática
-    staticTrigger: uniform(0.0),
-    staticStrength: uniform(6.0),
-    // Controles de Órbita y Giro (Q/W y A/S)
-    spinDirection: uniform(0.0), // 0.0 en reposo. 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
-    spinSpeed: uniform(1.5),     // Velocidad orbital ajustable (A/S)
-    vortexEnabled: uniform(1.0),
-    vortexStrength: uniform(1.4),
-    dragEnabled: uniform(1.0),
-    dragCoefficient: uniform(0.12)
+    // Control de tiempo y física general
+    timeScale: new THREE.Uniform(1.0),
+    dt: new THREE.Uniform(0.016),
+    maxSpeed: new THREE.Uniform(8.0),
+    initialSpeed: new THREE.Uniform(0.5),
+    boundsSize: new THREE.Uniform(new THREE.Vector3(12, 12, 12)),
+    
+    // Configuración del Modo Esfera
+    baseRadius: new THREE.Uniform(3.5),
+    sphereBlend: new THREE.Uniform(1.0), // 1.0 = Esfera, 0.0 = Arena
+    spinDirection: new THREE.Uniform(0.0), // Controlado por Q y W
+    spinSpeed: new THREE.Uniform(1.0),     // Controlado por A y S
+
+    // Configuración del Modo Arena / Fuerzas
+    attractor: new THREE.Uniform(new THREE.Vector3(0, 0, 0)),
+    softening: new THREE.Uniform(0.5),
+    
+    radialEnabled: new THREE.Uniform(0),
+    radialStrength: new THREE.Uniform(0.0),
+    
+    windEnabled: new THREE.Uniform(0),
+    wind: new THREE.Uniform(new THREE.Vector3(0, 0, 0)),
+    
+    vortexEnabled: new THREE.Uniform(0),
+    vortexStrength: new THREE.Uniform(0.0),
+    
+    dragEnabled: new THREE.Uniform(0),
+    dragCoefficient: new THREE.Uniform(0.05),
+
+    // Efectos de botones (B y N)
+    beat: new THREE.Uniform(0.0),
+    beatExpansion: new THREE.Uniform(1.5),
+    beatStrength: new THREE.Uniform(2.0),
+    
+    staticTrigger: new THREE.Uniform(0.0),
+    staticStrength: new THREE.Uniform(1.0),
+
+    // Apariencia visual
+    particleSize: new THREE.Uniform(0.08)
   };
 }
