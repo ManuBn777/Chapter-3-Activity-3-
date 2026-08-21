@@ -18,15 +18,15 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // Modos estructurales (0 = Arena / Libre, 1 = Esfera Cohesiva)
-    sphereMode: uniform(1.0),
-    sphereRadius: uniform(3.0),
+    // Estados estructurales: 0.0 = Arena (libre), 1.0 = Esfera (contenedora estática)
+    stateMode: uniform(1.0), 
+    containerRadius: uniform(3.5),
 
-    // B: Kick / Bounce (Bombo con rebote elástico)
+    // B: Kick / Bounce (Rebote elástico sobre la esfera)
     beat: uniform(0.0),
     beatStrength: uniform(14.0),
 
-    // N: Estática
+    // N: Estática (Dispersión / Temblor)
     staticTrigger: uniform(0.0),
     staticStrength: uniform(6.0),
 
