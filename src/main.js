@@ -77,12 +77,13 @@ async function main() {
   let paused = false;
   let mode = 'LAB';
   let panel;
+  let targetSphereBlend = 1.0; // Estado objetivo para la transición fluida
   let savedRadialStrength = params.radialStrength.value;
   let savedRadialEnabled = params.radialEnabled.value;
   const clock = new THREE.Clock();
 
   const triggerBeat = () => {
-    params.beat.value = Math.min(2.0, params.beat.value + 1.2);
+    params.beat.value = Math.min(2.5, params.beat.value + 1.5);
   };
 
   const triggerStatic = () => {
@@ -90,9 +91,7 @@ async function main() {
   };
 
   const toggleStateMode = () => {
-    // Alterna de manera directa el valor del uniforme TSL en la GPU sin perder contexto
-    params.stateMode.value = params.stateMode.value === 1.0 ? 0.0 : 1.0;
-    simulation.reset();
+    targetSphereBlend = targetSphereBlend === 1.0 ? 0.0 : 1.0;
   };
 
   const applyPreset = (id) => {
@@ -135,7 +134,7 @@ async function main() {
     attractorHelper.visible = lab;
     performanceGuide.visible = !lab;
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: perf · R: reset · B: kick/bounce · N: estática · E: esfera/arena'
+      ? '<strong>LAB</strong> · P: perf · R: reset · B: kick/bounce · N: estática · E: esfera/arena fluida'
       : '';
   };
 
@@ -193,7 +192,12 @@ async function main() {
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
     
-    params.beat.value = Math.max(0, params.beat.value - delta * 6.0);
+    // Interpolar fluidamente el blend de la esfera / arena
+    const blendDiff = targetSphereBlend - params.sphereBlend.value;
+    params.sphereBlend.value += blendDiff * Math.min(1.0, delta * 4.0);
+
+    // Decaimiento rápido del kick y la estática
+    params.beat.value = Math.max(0, params.beat.value - delta * 7.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
