@@ -18,13 +18,9 @@ import {
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
-  // STATE -----------------------------------------------------------------
-  // Each particle owns position and velocity. The arrays live in GPU storage.
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-  // INITIALIZATION --------------------------------------------------------
-  // A compute pass writes the initial state for every particle in parallel.
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -38,7 +34,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Spawn particles throughout a sphere instead of a cube.
     const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
     const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
 
@@ -46,9 +41,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
-  // UPDATE / COMPUTE SHADER ----------------------------------------------
-  // This is the conceptual heart of the project:
-  // state -> forces -> acceleration -> velocity -> position.
   const updateParticles = Fn(() => {
     const p = positionBuffer.element(instanceIndex);
     const v = velocityBuffer.element(instanceIndex);
@@ -59,7 +51,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 1) CONSTANT / WIND FORCE
     force.addAssign(params.wind.mul(params.windEnabled));
 
-    // 2) RADIAL FORCE (positive = attraction, negative = repulsion)
+    // 2) RADIAL FORCE
     const toAttractor = params.attractor.sub(p);
     const distance = max(toAttractor.length(), params.softening);
     const radialDirection = toAttractor.div(distance);
@@ -69,19 +61,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) KICK / SHOCKWAVE (Tecla B): 
-    // Onda radial expansiva instantánea que se propaga en anillo
-    const waveRadius = params.beat.mul(6.0);
+    // 3) ESTADO ESFERA COHESIVA (Fuerza elástica que mantiene la forma de esfera)
+    // Si sphereMode está activo, tira de las partículas hacia el radio ideal de la esfera
+    const idealSpherePos = radialDirection.mul(params.sphereRadius).negate().add(params.attractor);
+    const sphereRestitution = idealSpherePos.sub(p).mul(15.0).mul(params.sphereMode);
+    force.addAssign(sphereRestitution);
+
+    // 4) KICK / BOUNCE (Tecla B): 
+    // Impacto de bombo que comprime/expande la esfera de golpe y rebota elásticamente
+    const waveRadius = params.beat.mul(5.0);
     const waveBand = distance.sub(waveRadius).abs();
-    const shockwave = radialDirection
+    const bounceShockwave = radialDirection
       .mul(params.beatStrength)
       .mul(-1.0)
       .mul(params.beat)
       .div(waveBand.add(0.2));
-    force.addAssign(shockwave);
+    force.addAssign(bounceShockwave);
 
-    // 4) ESTÁTICA / DISPERSIÓN (Tecla N):
-    // Temblor de alta frecuencia + dispersión caótica para rellenar todo el volumen del espacio
+    // 5) ESTÁTICA / ARENA (Tecla N):
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
@@ -96,16 +93,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       
     force.addAssign(staticEffect);
 
-    // 5) VORTEX FORCE: tangent to the radial direction around Z.
+    // 6) VORTEX FORCE
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 6) LINEAR DRAG: F = -c v
-    force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
+    // 7) LINEAR DRAG (Aumentamos un poco el drag cuando hay esfera para que no oscile infinito)
+    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(2.5), params.sphereMode);
+    force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
-    // INTEGRATION ---------------------------------------------------------
-    // Unit mass: a = F. Semi-implicit Euler: update v, then p.
+    // INTEGRATION
     v.addAssign(force.mul(dt));
 
     const speed = v.length();
@@ -115,13 +112,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // Periodic boundary conditions: particles leaving one side re-enter.
     const half = params.boundsSize.mul(0.5);
     p.assign(mod(p.add(half), params.boundsSize).sub(half));
   })().compute(count).setName('Update Particles');
 
-  // RENDER ---------------------------------------------------------------
-  // Rendering does not recompute the physics. It consumes the GPU state.
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -139,7 +133,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     return vec4(mix(slow, fast, t), 1.0);
   })();
 
-  // Circular sprite mask, avoiding visible square planes.
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
 
   const geometry = new THREE.PlaneGeometry(1, 1);
