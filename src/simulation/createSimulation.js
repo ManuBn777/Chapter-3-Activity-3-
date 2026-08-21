@@ -34,7 +34,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica real en 3D para el inicio
+    // Distribución esférica volumétrica 3D inicial
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
@@ -51,38 +51,31 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Inercia sutil, volumen 3D y beat)
+    // 1) MODO ESFERA (Inercia sutil, volumen 3D y rebote elástico)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Inercia y flujo interno suave dentro de la esfera
+      // Inercia y flujo interno suave para que no esté estática
       const sphereFlow = vec3(
         sin(p.y.mul(1.5)),
         sin(p.z.mul(1.5)),
         sin(p.x.mul(1.5))
-      ).mul(0.8);
+      ).mul(1.2);
       force.addAssign(sphereFlow.mul(params.sphereBlend));
-
-      // Impulso del beat en modo esfera
-      If(params.beat.greaterThan(0.01), () => {
-        const beatImpulse = p.normalize().mul(params.beat.mul(params.beatExpansion));
-        force.addAssign(beatImpulse.mul(params.sphereBlend));
-      });
 
       // Contención elástica para mantener la forma esférica sin aplanarse
       If(distFromCenter.greaterThan(params.baseRadius), () => {
         const diff = distFromCenter.sub(params.baseRadius);
-        force.addAssign(p.normalize().negate().mul(diff.mul(60.0)).mul(params.sphereBlend));
+        force.addAssign(p.normalize().negate().mul(diff.mul(80.0)).mul(params.sphereBlend));
       });
 
-      // Amortiguación propia del modo esfera para mantener la inercia fluida
-      force.addAssign(v.mul(-1.2).mul(params.sphereBlend));
+      // Amortiguación ligera para conservar la inercia fluida
+      force.addAssign(v.mul(-0.5).mul(params.sphereBlend));
     });
 
     // ==========================================
-    // 2) MODO ARENA (Comportamiento original completo)
+    // 2) MODO ARENA (Comportamiento dinámico original)
     // ==========================================
     If(params.sphereBlend.lessThan(0.99), () => {
-      // Fuerza radial del mouse / attractor
       const effectiveAttractor = params.attractor;
       const toAttractor = effectiveAttractor.sub(p);
       const distance = max(toAttractor.length(), params.softening);
@@ -95,31 +88,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         
       force.addAssign(radialForce.mul(params.sphereBlend.oneMinus()));
 
-      // Onda de choque clásica del beat en arena
-      const centerDir = p.normalize();
-      const waveRadius = params.beat.mul(6.0);
-      const waveBand = distFromCenter.sub(waveRadius).abs();
-      const arenaShockwave = centerDir
-        .mul(params.beatStrength)
-        .mul(params.beat)
-        .div(waveBand.add(0.2));
-      force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
-
-      // Dispersión estática / aleatoria (Tecla N u otros triggers)
-      const randomScatter = vec3(
-        hash(instanceIndex.add(uint(13))),
-        hash(instanceIndex.add(uint(23))),
-        hash(instanceIndex.add(uint(37)))
-      ).sub(0.5);
-
-      const rippleFreq = distFromCenter.mul(25.0);
-      const staticEffect = randomScatter
-        .mul(params.staticStrength)
-        .add(radialDirection.mul(sin(rippleFreq)).mul(2.0))
-        .mul(params.staticTrigger);
-        
-      force.addAssign(staticEffect.mul(params.sphereBlend.oneMinus()));
-
       // Viento y Vortex originales
       force.addAssign(params.wind.mul(params.windEnabled).mul(params.sphereBlend.oneMinus()));
 
@@ -129,6 +97,34 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
       // Drag lineal original de arena
       force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0).mul(params.sphereBlend.oneMinus()));
+    });
+
+    // ==========================================
+    // 3) BOTÓN B: KICK / THUMP (Onda de choque rápida de expansión y retorno)
+    // ==========================================
+    If(params.beat.greaterThan(0.01), () => {
+      const centerDir = p.normalize();
+      const waveRadius = params.beat.mul(8.0);
+      const waveBand = distFromCenter.sub(waveRadius).abs();
+      const thumpShockwave = centerDir
+        .mul(params.beatStrength)
+        .mul(params.beat)
+        .div(waveBand.add(0.15));
+      force.addAssign(thumpShockwave);
+    });
+
+    // ==========================================
+    // 4) BOTÓN N: ESTÁTICA / DISPERSIÓN ALEATORIA
+    // ==========================================
+    If(params.staticTrigger.greaterThan(0.01), () => {
+      const randomScatter = vec3(
+        hash(instanceIndex.add(uint(13))),
+        hash(instanceIndex.add(uint(23))),
+        hash(instanceIndex.add(uint(37)))
+      ).sub(0.5);
+
+      const staticEffect = randomScatter.mul(params.staticStrength).mul(params.staticTrigger);
+      force.addAssign(staticEffect);
     });
 
     // ==========================================
