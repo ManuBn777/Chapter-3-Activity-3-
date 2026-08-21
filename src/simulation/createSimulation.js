@@ -61,27 +61,25 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) ESTADO ESFERA (Límite contenedor estático) vs ESTADO ARENA (Libre)
+    // 3) ESTADO ESFERA ESTÁTICO (Contenedor firme sin temblores)
     const distFromCenter = p.length();
-    
-    // Si estamos en Modo Esfera (1.0), contenemos estrictamente a las partículas dentro de la esfera
-    If(params.stateMode.equal(1.0), () => {
+    If(params.sphereBlend.greaterThan(0.01), () => {
       If(distFromCenter.greaterThan(params.containerRadius), () => {
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(60.0);
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(80.0).mul(params.sphereBlend);
         force.addAssign(pushIn);
       });
     });
 
-    // 4) KICK / BOUNCE (Tecla B): Onda expansiva con rebote elástico
-    const waveRadius = params.beat.mul(6.0);
+    // 4) KICK / BOUNCE (Tecla B): Ataque contundente, rápido y elástico
+    const waveRadius = params.beat.mul(7.0);
     const waveBand = distFromCenter.sub(waveRadius).abs();
     const bounceShockwave = p.normalize()
       .mul(params.beatStrength)
       .mul(params.beat)
-      .div(waveBand.add(0.2));
+      .div(waveBand.add(0.15));
     force.addAssign(bounceShockwave);
 
-    // 5) ESTÁTICA / ARENA (Tecla N): Dispersión / temblor
+    // 5) ESTÁTICA / ARENA (Tecla N): Dispersión
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
@@ -101,8 +99,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 7) LINEAR DRAG
-    force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
+    // 7) LINEAR DRAG (Más amortiguación en modo esfera para mantener la inercia limpia)
+    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(3.0), params.sphereBlend);
+    force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
     // INTEGRATION
     v.addAssign(force.mul(dt));
@@ -114,11 +113,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // 8) LÍMITES DE ESPACIO: Si estamos en Modo Arena (0.0), recuperamos el comportamiento libre con wrap periódico
-    If(params.stateMode.equal(0.0), () => {
-      const half = params.boundsSize.mul(0.5);
-      p.assign(mod(p.add(half), params.boundsSize).sub(half));
-    });
+    // 8) LÍMITES PERIÓDICOS (Se atenúan o desactivan fluidamente cuando entra la esfera)
+    const half = params.boundsSize.mul(0.5);
+    const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
+    p.assign(mix(wrappedPos, p, params.sphereBlend));
   })().compute(count).setName('Update Particles');
 
   const material = new THREE.SpriteNodeMaterial({
