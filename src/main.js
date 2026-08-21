@@ -90,6 +90,7 @@ async function main() {
   };
 
   const toggleStateMode = () => {
+    // Alterna de manera directa el valor del uniforme TSL en la GPU sin perder contexto
     params.stateMode.value = params.stateMode.value === 1.0 ? 0.0 : 1.0;
     simulation.reset();
   };
