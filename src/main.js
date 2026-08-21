@@ -89,8 +89,9 @@ async function main() {
     params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
   };
 
-  const toggleSphereMode = () => {
-    params.sphereMode.value = params.sphereMode.value === 1.0 ? 0.0 : 1.0;
+  const toggleStateMode = () => {
+    params.stateMode.value = params.stateMode.value === 1.0 ? 0.0 : 1.0;
+    simulation.reset();
   };
 
   const applyPreset = (id) => {
@@ -133,7 +134,7 @@ async function main() {
     attractorHelper.visible = lab;
     performanceGuide.visible = !lab;
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: performance · R: reset · B: bounce/kick · N: estática · E: toggle esfera/arena'
+      ? '<strong>LAB</strong> · P: perf · R: reset · B: kick/bounce · N: estática · E: esfera/arena'
       : '';
   };
 
@@ -162,7 +163,7 @@ async function main() {
     if (event.code === 'Digit5') applyPreset('vortex');
     if (event.code === 'KeyB') triggerBeat();
     if (event.code === 'KeyN') triggerStatic();
-    if (event.code === 'KeyE') toggleSphereMode();
+    if (event.code === 'KeyE') toggleStateMode();
 
     if (event.code === 'Space') {
       event.preventDefault();
