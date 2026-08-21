@@ -1,45 +1,37 @@
 import * as THREE from 'three/webgpu';
 
-export function createParameters() {
-  return {
-    // Control de tiempo y física general
-    timeScale: new THREE.Uniform(1.0),
-    dt: new THREE.Uniform(0.016),
-    maxSpeed: new THREE.Uniform(8.0),
-    initialSpeed: new THREE.Uniform(0.5),
-    boundsSize: new THREE.Uniform(new THREE.Vector3(12, 12, 12)),
-    
-    // Configuración del Modo Esfera
-    baseRadius: new THREE.Uniform(3.5),
-    sphereBlend: new THREE.Uniform(1.0), // 1.0 = Esfera, 0.0 = Arena
-    spinDirection: new THREE.Uniform(0.0), // Controlado por Q y W
-    spinSpeed: new THREE.Uniform(1.0),     // Controlado por A y S
+export const params = {
+  // Configuración general y de tiempo
+  count: 131072,
+  dt: 0.016,
+  timeScale: 1.0,
+  maxSpeed: 15.0,
+  initialSpeed: 2.0,
+  particleSize: 0.15,
+  boundsSize: new THREE.Vector3(10.0, 10.0, 10.0),
 
-    // Configuración del Modo Arena / Fuerzas
-    attractor: new THREE.Uniform(new THREE.Vector3(0, 0, 0)),
-    softening: new THREE.Uniform(0.5),
-    
-    radialEnabled: new THREE.Uniform(0),
-    radialStrength: new THREE.Uniform(0.0),
-    
-    windEnabled: new THREE.Uniform(0),
-    wind: new THREE.Uniform(new THREE.Vector3(0, 0, 0)),
-    
-    vortexEnabled: new THREE.Uniform(0),
-    vortexStrength: new THREE.Uniform(0.0),
-    
-    dragEnabled: new THREE.Uniform(0),
-    dragCoefficient: new THREE.Uniform(0.05),
+  // Modos y Transiciones
+  sphereBlend: 0.0, // 0 = Modo Arena, 1 = Modo Esfera
 
-    // Efectos de botones (B y N)
-    beat: new THREE.Uniform(0.0),
-    beatExpansion: new THREE.Uniform(1.5),
-    beatStrength: new THREE.Uniform(2.0),
-    
-    staticTrigger: new THREE.Uniform(0.0),
-    staticStrength: new THREE.Uniform(1.0),
+  // Parámetros específicos de la Esfera
+  baseRadius: 3.5,
+  beatExpansion: 2.5,
 
-    // Apariencia visual
-    particleSize: new THREE.Uniform(0.08)
-  };
-}
+  // Controles de interacción (Beat / B y Estática / N)
+  beat: 0.0,
+  beatStrength: 1.0,
+  staticTrigger: 0.0,
+  staticStrength: 1.0,
+
+  // Fuerzas del Modo Arena
+  attractor: new THREE.Vector3(0, 0, 0),
+  softening: 1.0,
+  radialStrength: 5.0,
+  radialEnabled: 1.0,
+  wind: new THREE.Vector3(1.0, 0.0, 0.0),
+  windEnabled: 0.0,
+  vortexStrength: 2.0,
+  vortexEnabled: 1.0,
+  dragCoefficient: 0.5,
+  dragEnabled: 1.0
+};
