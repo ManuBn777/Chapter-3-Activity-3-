@@ -1,8 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 
-// Uniforms are CPU-side values that TSL exposes to the GPU.
-// Changing .value does not rebuild the compute shader.
 export function createParameters() {
   return {
     dt: uniform(1 / 60),
@@ -20,9 +18,13 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // B triggers this short manual outward pulse (Thump).
+    // B: Kick / Shockwave (Bombo)
     beat: uniform(0.0),
-    beatStrength: uniform(8.0), // Fuerza con la que se expande el golpe
+    beatStrength: uniform(12.0),
+
+    // N: Estática (Efecto de onda de agua/vibración rápida)
+    staticTrigger: uniform(0.0),
+    staticStrength: uniform(6.0),
 
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
