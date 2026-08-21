@@ -35,11 +35,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r4 = hash(i.add(uint(53)));
     const r5 = hash(i.add(uint(71)));
     const r6 = hash(i.add(uint(89)));
-    const r7 = hash(i.add(uint(107)));
 
-    // Spawn particles throughout a sphere instead of a cube.
-    const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
-    const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
+    // A quiet circular surface: particles begin near their resting radius.
+    const spawnDirection = vec3(r1.sub(0.5), r2.sub(0.5), 0.0).normalize();
+    const spawnRadius = params.rippleRestRadius.add(r3.sub(0.5).mul(0.12));
 
     p.assign(spawnDirection.mul(spawnRadius));
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
@@ -68,9 +67,27 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) BEAT PULSE: a short outward impulse from the attractor.
-    // beat is set by the performer and decays on the CPU each frame.
-    force.addAssign(radialDirection.mul(-params.beatStrength).mul(params.beat));
+    // 3) CIRCULAR SURFACE WAVE: a spring keeps particles near a target radius.
+    // B briefly expands that radius; as it returns, the same particles contract.
+    const planarToCenter = vec3(
+      params.attractor.x.sub(p.x),
+      params.attractor.y.sub(p.y),
+      0.0
+    );
+    const planarDistance = max(planarToCenter.length(), params.softening);
+    const planarOutward = planarToCenter.div(planarDistance).mul(-1.0);
+    const targetRadius = params.rippleRestRadius.add(
+      params.beat.mul(params.rippleAmplitude)
+    );
+    const radiusError = targetRadius.sub(planarDistance);
+    force.addAssign(
+      planarOutward.mul(radiusError).mul(params.rippleStiffness).mul(params.rippleEnabled)
+    );
+
+    // Keep the water surface close to the XY plane.
+    force.addAssign(
+      vec3(0.0, 0.0, p.z.mul(-params.surfaceStrength)).mul(params.rippleEnabled)
+    );
 
     // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
