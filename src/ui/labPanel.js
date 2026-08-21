@@ -96,6 +96,7 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
   force.innerHTML = '<h2>Fuerzas</h2>';
   panel.append(force);
 
+  refreshers.push(checkRow(force, 'Onda circular', params.rippleEnabled.value > 0, (v) => params.rippleEnabled.value = v ? 1 : 0, () => params.rippleEnabled.value > 0));
   refreshers.push(checkRow(force, 'Radial', params.radialEnabled.value > 0, (v) => params.radialEnabled.value = v ? 1 : 0, () => params.radialEnabled.value > 0));
   refreshers.push(rangeRow(force, 'radialStrength', state, 'radialStrength', -8, 8, 0.05, (v) => params.radialStrength.value = v, () => params.radialStrength.value));
   refreshers.push(checkRow(force, 'Vórtice', params.vortexEnabled.value > 0, (v) => params.vortexEnabled.value = v ? 1 : 0, () => params.vortexEnabled.value > 0));
@@ -115,7 +116,8 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
     ['wind', '2 · Fuerza constante +X'],
     ['attract', '3 · Atracción'],
     ['repel', '4 · Repulsión'],
-    ['vortex', '5 · Vórtice']
+    ['vortex', '5 · Vórtice'],
+    ['ripple', '6 · Onda circular']
   ]) button(tests, label, () => onPreset(id));
 
   const actions = document.createElement('div');
@@ -123,7 +125,7 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
   button(actions, 'Reset', onReset);
-  button(actions, 'Golpe · B', onBeat);
+  button(actions, 'Onda · B', onBeat);
   button(actions, 'Pausar / continuar', () => onPauseChange());
   button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 
