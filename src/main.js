@@ -7,20 +7,7 @@ import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-/*
-2^15: 32768
-2^16: 65536
-2^17: 131072
-2^18: 262144
-2^19: 524288
-2^20: 1048576
-2^21: 2097152
-2^22: 4194304
-2^23: 8388608
-2^24: 16777216
-*/
-
-const PARTICLE_COUNT = 131072; // 2^17. Increase only after measuring performance.
+const PARTICLE_COUNT = 131072;
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -30,7 +17,6 @@ async function main() {
     throw new Error('Este proyecto requiere WebGPU para ejecutar compute shaders.');
   }
 
-  // THREE.JS MENTAL MODEL: scene + camera + renderer ---------------------
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#050607');
 
@@ -50,7 +36,6 @@ async function main() {
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
-  // LAB HELPERS -----------------------------------------------------------
   const attractorHelper = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 16, 12),
     new THREE.MeshBasicMaterial({ color: '#ffffff' })
@@ -73,7 +58,6 @@ async function main() {
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
-  // POINTER -> WORLD POSITION --------------------------------------------
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -97,13 +81,16 @@ async function main() {
   let savedRadialEnabled = params.radialEnabled.value;
   const clock = new THREE.Clock();
 
-  // Acumulación de energía para tempos altos (130+ BPM)
   const triggerBeat = () => {
     params.beat.value = Math.min(2.0, params.beat.value + 1.2);
   };
 
   const triggerStatic = () => {
     params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
+  };
+
+  const toggleSphereMode = () => {
+    params.sphereMode.value = params.sphereMode.value === 1.0 ? 0.0 : 1.0;
   };
 
   const applyPreset = (id) => {
@@ -146,7 +133,7 @@ async function main() {
     attractorHelper.visible = lab;
     performanceGuide.visible = !lab;
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: performance · R: reset · B: kick (shockwave) · N: estática · 1–5: pruebas'
+      ? '<strong>LAB</strong> · P: performance · R: reset · B: bounce/kick · N: estática · E: toggle esfera/arena'
       : '';
   };
 
@@ -164,7 +151,6 @@ async function main() {
   document.body.append(hud);
   setMode('LAB');
 
-  // KEYBOARD LISTENERS ---------------------------------------------------
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
@@ -176,6 +162,7 @@ async function main() {
     if (event.code === 'Digit5') applyPreset('vortex');
     if (event.code === 'KeyB') triggerBeat();
     if (event.code === 'KeyN') triggerStatic();
+    if (event.code === 'KeyE') toggleSphereMode();
 
     if (event.code === 'Space') {
       event.preventDefault();
@@ -201,11 +188,9 @@ async function main() {
 
   simulation.reset();
 
-  // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
     
-    // Decaimiento rápido y agresivo para soportar ritmos altos (130+ BPM) sin perder el transitorio
     params.beat.value = Math.max(0, params.beat.value - delta * 6.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
