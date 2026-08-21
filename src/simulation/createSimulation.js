@@ -29,17 +29,14 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
-    const r4 = hash(i.add(uint(53)));
-    const r5 = hash(i.add(uint(71)));
-    const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución volumétrica tridimensional real (rellena todo el volumen de la esfera)
+    // Distribución esférica volumétrica real en 3D (rellena todo el volumen interior)
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(0.0)); // Nacen completamente quietas, sin velocidad inicial aleatoria
+    v.assign(vec3(0.0)); // Velocidad inicial absolutamente en cero (quieta)
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -51,26 +48,26 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-    // MODO ESFERA ESTÁTICA Y VOLUMÉTRICA (Sin aplanarse en aros)
+    // MODO ESFERA QUIETA Y ESTÁTICA
     If(params.sphereBlend.greaterThan(0.01), () => {
       
-      // 1. Impulso sutil del Beat (expansión suave de toda la esfera sin romper el volumen)
+      // 1. Si se pulsa el beat, da un pequeño impulso de expansión hacia afuera y regresa
       If(params.beat.greaterThan(0.01), () => {
         const beatImpulse = p.normalize().mul(params.beat.mul(params.beatExpansion));
         force.addAssign(beatImpulse.mul(params.sphereBlend));
       });
 
-      // 2. Contención elástica suave para mantener el radio exacto de la esfera 3D
+      // 2. Mantener la estructura esférica firme sin dejar que las partículas se dispersen
       If(distFromCenter.greaterThan(params.baseRadius), () => {
         const diff = distFromCenter.sub(params.baseRadius);
-        force.addAssign(p.normalize().negate().mul(diff.mul(50.0)).mul(params.sphereBlend));
+        force.addAssign(p.normalize().negate().mul(diff.mul(100.0)).mul(params.sphereBlend));
       });
 
-      // 3. Amortiguación total (damping/drag fuerte) para que las partículas se queden quietas donde están
-      force.addAssign(v.mul(-10.0).mul(params.sphereBlend));
+      // 3. Fricción total altísima para anular cualquier inercia residual (mantiene la esfera totalmente quieta)
+      force.addAssign(v.mul(-25.0).mul(params.sphereBlend));
     });
 
-    // MODO ARENA (Cuando sphereBlend es 0)
+    // MODO ARENA (Comportamiento dinámico alternativo cuando sphereBlend es 0)
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
       const waveRadius = params.beat.mul(6.0);
@@ -81,7 +78,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         .div(waveBand.add(0.2));
       force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
 
-      // Viento y fuerzas externas opcionales en modo arena
       force.addAssign(params.wind.mul(params.windEnabled));
       force.addAssign(v.mul(params.dragCoefficient).mul(-1.0));
     });
@@ -90,7 +86,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     v.addAssign(force.mul(dt));
     p.addAssign(v.mul(dt));
 
-    // Límites periódicos solo activos en modo arena
+    // Límites periódicos solo en modo arena
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
