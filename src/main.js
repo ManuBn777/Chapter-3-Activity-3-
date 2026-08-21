@@ -36,7 +36,6 @@ async function main() {
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
-  // Elementos visuales
   const attractorHelper = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 16, 12),
     new THREE.MeshBasicMaterial({ color: '#ffffff' })
@@ -53,7 +52,6 @@ async function main() {
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
-  // Interacción
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -70,14 +68,13 @@ async function main() {
     }
   });
 
-  // Estado y lógica
   let paused = false;
   let mode = 'LAB';
-  let targetSphereBlend = 1.0; // 1.0 = Esfera, 0.0 = Arena
+  let targetSphereBlend = 1.0;
   const clock = new THREE.Clock();
 
   const triggerBeat = () => {
-    params.beat.value = 1.0; // Disparo del Kick
+    params.beat.value = 1.0;
   };
 
   const triggerStatic = () => {
@@ -126,7 +123,6 @@ async function main() {
 
   setMode('LAB');
 
-  // Listeners
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
@@ -134,6 +130,20 @@ async function main() {
     if (event.code === 'KeyB') triggerBeat();
     if (event.code === 'KeyN') triggerStatic();
     if (event.code === 'KeyE') toggleStateMode();
+
+    // Controles de Órbita y Giro (Q/W y A/S)
+    if (event.code === 'KeyQ') {
+      params.spinDirection.value = -1.0; // Giro a la izquierda
+    }
+    if (event.code === 'KeyW') {
+      params.spinDirection.value = 1.0;  // Giro a la derecha
+    }
+    if (event.code === 'KeyA') {
+      params.spinSpeed.value = Math.max(0.0, params.spinSpeed.value - 0.5); // Reducir velocidad
+    }
+    if (event.code === 'KeyS') {
+      params.spinSpeed.value = Math.min(5.0, params.spinSpeed.value + 0.5); // Aumentar velocidad
+    }
   });
 
   addEventListener('resize', () => {
@@ -147,10 +157,7 @@ async function main() {
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
     
-    // Interpolar fluidamente el blend entre Esfera y Arena
     params.sphereBlend.value += (targetSphereBlend - params.sphereBlend.value) * Math.min(1.0, delta * 4.0);
-
-    // Decaimiento rápido del Kick (Rebote elástico) y de la Estática
     params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
