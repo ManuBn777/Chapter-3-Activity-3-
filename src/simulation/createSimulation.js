@@ -35,7 +35,7 @@ export function createSimulation({
     instancedArray(count, 'vec3');
 
   // ============================================================
-  // INICIALIZACIÓN
+  // INITIALIZE
   // ============================================================
 
   const initParticles = Fn(() => {
@@ -49,7 +49,7 @@ export function createSimulation({
       velocityBuffer.element(i);
 
     // ----------------------------------------------------------
-    // RANDOM
+    // RANDOM VALUES
     // ----------------------------------------------------------
 
     const r1 = hash(i.add(uint(11)));
@@ -63,10 +63,13 @@ export function createSimulation({
     const r7 = hash(i.add(uint(107)));
 
     // ----------------------------------------------------------
-    // POSICIÓN DENTRO DE UNA ESFERA
+    // DISTRIBUCIÓN VOLUMÉTRICA
     // ----------------------------------------------------------
 
-    const spawnDirection =
+    /*
+     * Dirección aleatoria.
+     */
+    const direction =
       vec3(r1, r2, r3)
         .sub(0.5)
         .normalize();
@@ -74,32 +77,30 @@ export function createSimulation({
     /*
      * IMPORTANTE:
      *
-     * Antes utilizábamos:
+     * r^(1/3) produce una distribución uniforme
+     * dentro del volumen de una esfera.
      *
-     * boundsSize * 0.45
-     *
-     * Eso generaba partículas hasta radio 4.5,
-     * mientras la esfera tenía radio 2.
-     *
-     * Ahora las partículas nacen dentro de la
-     * propia esfera.
+     * Las partículas NO se colocan sobre la superficie.
      */
 
-    const spawnRadius =
+    const radius =
       r7
         .pow(1.0 / 3.0)
-        .mul(
-          params.baseRadius.mul(0.92)
-        );
+        .mul(params.baseRadius.mul(0.95));
 
     p.assign(
-      spawnDirection.mul(spawnRadius)
+      direction.mul(radius)
     );
 
     // ----------------------------------------------------------
     // VELOCIDAD INICIAL
     // ----------------------------------------------------------
 
+    /*
+     * Movimiento inicial pequeño y aleatorio.
+     *
+     * No queremos que salgan disparadas.
+     */
     v.assign(
       vec3(r4, r5, r6)
         .sub(0.5)
@@ -110,17 +111,20 @@ export function createSimulation({
     .compute(count)
     .setName('Initialize Particles');
 
+
   // ============================================================
   // UPDATE
   // ============================================================
 
   const updateParticles = Fn(() => {
 
+    const i = instanceIndex;
+
     const p =
-      positionBuffer.element(instanceIndex);
+      positionBuffer.element(i);
 
     const v =
-      velocityBuffer.element(instanceIndex);
+      velocityBuffer.element(i);
 
     const dt =
       params.dt.mul(params.timeScale);
@@ -129,244 +133,121 @@ export function createSimulation({
       vec3(0.0).toVar();
 
     // ==========================================================
-    // DISTANCIA AL CENTRO
+    // INFORMACIÓN DE POSICIÓN
     // ==========================================================
 
-    const distFromCenter =
-      p.length();
-
-    const safeDistance =
+    const dist =
       max(
-        distFromCenter,
-        params.softening
+        p.length(),
+        0.001
       );
 
-    const radialDirection =
-      p.div(safeDistance);
+    const normal =
+      p.div(dist);
 
     // ==========================================================
-    // 1. FUERZA RADIAL / MOUSE
+    // 1. MOVIMIENTO INTERNO
     // ==========================================================
 
-    const effectiveAttractor =
-      mix(
-        params.attractor,
-        vec3(0.0),
-        params.sphereBlend
-      );
+    /*
+     * En lugar de una fuerza radial, usamos un campo
+     * tridimensional de movimiento.
+     *
+     * Esto hace que las partículas circulen dentro
+     * de la esfera sin ser empujadas hacia la superficie.
+     *
+     * MUY IMPORTANTE:
+     *
+     * No modifica el radio directamente.
+     */
 
-    const toAttractor =
-      effectiveAttractor.sub(p);
-
-    const distance =
-      max(
-        toAttractor.length(),
-        params.softening
-      );
-
-    const attractDirection =
-      toAttractor.div(distance);
-
-    const radialForce =
-      attractDirection
-        .mul(params.radialStrength)
-        .div(distance.pow(2))
-        .mul(params.radialEnabled)
-        .mul(params.sphereBlend.oneMinus());
+    const internalFlow =
+      vec3(
+        p.y.negate(),
+        p.x,
+        sin(p.z.mul(2.7))
+      )
+      .mul(0.18);
 
     force.addAssign(
-      radialForce
+      internalFlow
+        .mul(params.sphereBlend)
     );
 
     // ==========================================================
-    // RADIO DE LA ESFERA
+    // 2. PEQUEÑO MOVIMIENTO VERTICAL / PROFUNDIDAD
     // ==========================================================
 
-    const effectiveRadius =
-      params.baseRadius.add(
-        params.beat.mul(
-          params.beatExpansion
-        )
-      );
+    const depthFlow =
+      vec3(
+        sin(p.y.mul(2.1)),
+        sin(p.z.mul(1.7)),
+        sin(p.x.mul(2.4))
+      )
+      .mul(0.10);
 
-    // ==========================================================
-    // 2. MODO ESFERA
-    // ==========================================================
-
-    If(
-      params.sphereBlend.greaterThan(0.01),
-      () => {
-
-        // ------------------------------------------------------
-        // A. INERCIA / MOVIMIENTO INTERNO
-        // ------------------------------------------------------
-
-        /*
-         * Movimiento tangencial suave.
-         *
-         * No intenta mandar las partículas hacia
-         * la superficie.
-         *
-         * Simplemente mantiene una sensación de
-         * movimiento continuo.
-         */
-
-        const zAxis =
-          vec3(0.0, 0.0, 1.0);
-
-        const tangent =
-          zAxis
-            .cross(radialDirection);
-
-        const orbitalForce =
-          tangent
-            .mul(params.spinDirection)
-            .mul(params.spinSpeed)
-            .mul(0.35);
-
-        force.addAssign(
-          orbitalForce.mul(
-            params.sphereBlend
-          )
-        );
-
-        // ------------------------------------------------------
-        // B. EXPANSIÓN SUAVE
-        // ------------------------------------------------------
-
-        /*
-         * En lugar de disparar las partículas,
-         * el beat genera una pequeña fuerza radial.
-         *
-         * Esto hace que el volumen se expanda
-         * sin convertirse en un aro.
-         */
-
-        If(
-          params.beat.greaterThan(0.01),
-          () => {
-
-            const expansionAmount =
-              effectiveRadius
-                .sub(params.baseRadius);
-
-            const expansionForce =
-              radialDirection
-                .mul(expansionAmount)
-                .mul(1.5);
-
-            force.addAssign(
-              expansionForce
-                .mul(params.sphereBlend)
-            );
-
-          }
-        );
-
-        // ------------------------------------------------------
-        // C. CONTENCIÓN EXTERIOR
-        // ------------------------------------------------------
-
-        If(
-          distFromCenter.greaterThan(
-            effectiveRadius
-          ),
-          () => {
-
-            const distanceDiff =
-              distFromCenter.sub(
-                effectiveRadius
-              );
-
-            const elasticPull =
-              radialDirection
-                .negate()
-                .mul(
-                  distanceDiff
-                    .pow(1.2)
-                    .mul(80.0)
-                );
-
-            force.addAssign(
-              elasticPull.mul(
-                params.sphereBlend
-              )
-            );
-
-          }
-        );
-
-        // ------------------------------------------------------
-        // D. CONTENCIÓN INTERIOR
-        // ------------------------------------------------------
-
-        /*
-         * Evita que las partículas se acumulen
-         * demasiado cerca del centro.
-         *
-         * Es mucho más suave que antes.
-         */
-
-        const innerRadius =
-          params.baseRadius.mul(0.15);
-
-        If(
-          distFromCenter.lessThan(
-            innerRadius
-          ),
-          () => {
-
-            const innerPush =
-              radialDirection
-                .mul(
-                  innerRadius.sub(
-                    distFromCenter
-                  )
-                )
-                .mul(8.0);
-
-            force.addAssign(
-              innerPush.mul(
-                params.sphereBlend
-              )
-            );
-
-          }
-        );
-
-      }
+    force.addAssign(
+      depthFlow
+        .mul(params.sphereBlend)
     );
 
     // ==========================================================
-    // 3. MODO ARENA
+    // 3. B — THUMP
     // ==========================================================
 
+    /*
+     * NO HAY:
+     *
+     * - bounce
+     * - spring
+     * - elastic force
+     * - secondary bounce
+     * - impulso radial acumulativo
+     *
+     * El B simplemente expande temporalmente las posiciones.
+     *
+     * El valor beat viene de main.js y dura muy poco.
+     */
+
     If(
-      params.sphereBlend.lessThan(0.99),
+      params.beat.greaterThan(0.001),
       () => {
 
-        const centerDir =
-          radialDirection;
+        /*
+         * Expansión corta.
+         *
+         * beat = 0
+         *      ↓
+         * escala = 1
+         *
+         * beat = 1
+         *      ↓
+         * escala = 1 + kickAmount
+         */
 
-        const waveRadius =
-          params.beat.mul(6.0);
+        const kickScale =
+          vec3(1.0).add(
+            params.beat.mul(
+              params.kickAmount
+            )
+          );
 
-        const waveBand =
-          distFromCenter
-            .sub(waveRadius)
-            .abs();
+        /*
+         * Expandimos cada partícula desde el centro.
+         *
+         * Esto mantiene la forma esférica.
+         *
+         * NO crea una onda que empuje las partículas
+         * hacia la superficie.
+         */
 
-        const arenaShockwave =
-          centerDir
-            .mul(params.beatStrength)
-            .mul(params.beat)
-            .div(
-              waveBand.add(0.2)
-            );
-
-        force.addAssign(
-          arenaShockwave.mul(
-            params.sphereBlend.oneMinus()
+        p.assign(
+          p.mul(
+            mix(
+              vec3(1.0),
+              kickScale,
+              params.sphereBlend
+            )
           )
         );
 
@@ -374,26 +255,65 @@ export function createSimulation({
     );
 
     // ==========================================================
-    // 4. ESTÁTICA
+    // 4. CONTENCIÓN SUAVE
+    // ==========================================================
+
+    /*
+     * Solamente evitamos que una partícula se vaya
+     * completamente fuera de la esfera.
+     *
+     * NO existe una fuerza que atraiga todas las partículas
+     * hacia el borde.
+     */
+
+    const maxRadius =
+      params.baseRadius
+        .mul(1.15);
+
+    If(
+      dist.greaterThan(maxRadius),
+      () => {
+
+        const excess =
+          dist.sub(maxRadius);
+
+        const correction =
+          normal
+            .negate()
+            .mul(excess)
+            .mul(4.0);
+
+        force.addAssign(
+          correction
+            .mul(params.sphereBlend)
+        );
+
+      }
+    );
+
+    // ==========================================================
+    // 5. ESTÁTICA / N
     // ==========================================================
 
     const randomScatter =
       vec3(
-        hash(instanceIndex.add(uint(13))),
-        hash(instanceIndex.add(uint(23))),
-        hash(instanceIndex.add(uint(37)))
+        hash(i.add(uint(13))),
+        hash(i.add(uint(23))),
+        hash(i.add(uint(37)))
       )
       .sub(0.5);
 
-    const rippleFreq =
-      distFromCenter.mul(25.0);
+    const ripple =
+      sin(
+        dist.mul(25.0)
+      );
 
     const staticEffect =
       randomScatter
         .mul(params.staticStrength)
         .add(
-          radialDirection
-            .mul(sin(rippleFreq))
+          normal
+            .mul(ripple)
             .mul(2.0)
         )
         .mul(params.staticTrigger);
@@ -403,52 +323,88 @@ export function createSimulation({
     );
 
     // ==========================================================
-    // 5. VIENTO
+    // 6. ARENA
     // ==========================================================
 
-    force.addAssign(
-      params.wind
-        .mul(params.windEnabled)
-    );
+    If(
+      params.sphereBlend.lessThan(0.99),
+      () => {
 
-    // ==========================================================
-    // 6. VÓRTICE
-    // ==========================================================
+        // ------------------------------------------------------
+        // RADIAL MOUSE
+        // ------------------------------------------------------
 
-    const zAxis =
-      vec3(0.0, 0.0, 1.0);
+        const effectiveAttractor =
+          params.attractor;
 
-    const vortexDirection =
-      zAxis.cross(
-        radialDirection
-      );
+        const toAttractor =
+          effectiveAttractor.sub(p);
 
-    force.addAssign(
-      vortexDirection
-        .mul(params.vortexStrength)
-        .mul(params.vortexEnabled)
+        const distance =
+          max(
+            toAttractor.length(),
+            params.softening
+          );
+
+        const attractDirection =
+          toAttractor.div(distance);
+
+        const radialForce =
+          attractDirection
+            .mul(params.radialStrength)
+            .div(distance.pow(2))
+            .mul(params.radialEnabled);
+
+        force.addAssign(
+          radialForce
+            .mul(params.sphereBlend.oneMinus())
+        );
+
+        // ------------------------------------------------------
+        // VORTEX
+        // ------------------------------------------------------
+
+        const zAxis =
+          vec3(0.0, 0.0, 1.0);
+
+        const tangent =
+          zAxis.cross(
+            attractDirection
+          );
+
+        force.addAssign(
+          tangent
+            .mul(params.vortexStrength)
+            .mul(params.vortexEnabled)
+            .mul(params.sphereBlend.oneMinus())
+        );
+
+        // ------------------------------------------------------
+        // WIND
+        // ------------------------------------------------------
+
+        force.addAssign(
+          params.wind
+            .mul(params.windEnabled)
+            .mul(params.sphereBlend.oneMinus())
+        );
+
+      }
     );
 
     // ==========================================================
     // 7. DRAG
     // ==========================================================
 
-    const effectiveDrag =
-      mix(
-        params.dragCoefficient,
-        params.dragCoefficient.mul(2.5),
-        params.sphereBlend
-      );
-
     force.addAssign(
       v
-        .mul(effectiveDrag)
+        .mul(params.dragCoefficient)
         .mul(params.dragEnabled)
         .mul(-1.0)
     );
 
     // ==========================================================
-    // INTEGRACIÓN
+    // 8. INTEGRATION
     // ==========================================================
 
     v.addAssign(
@@ -486,21 +442,22 @@ export function createSimulation({
     );
 
     // ==========================================================
-    // LÍMITES ARENA
+    // ARENA — WRAP
     // ==========================================================
 
     const half =
       params.boundsSize.mul(0.5);
 
-    const wrappedPos =
+    const wrapped =
       mod(
         p.add(half),
         params.boundsSize
-      ).sub(half);
+      )
+      .sub(half);
 
     p.assign(
       mix(
-        wrappedPos,
+        wrapped,
         p,
         params.sphereBlend
       )
@@ -509,6 +466,7 @@ export function createSimulation({
   })()
     .compute(count)
     .setName('Update Particles');
+
 
   // ============================================================
   // MATERIAL
@@ -569,12 +527,16 @@ export function createSimulation({
       0.5
     );
 
+
   // ============================================================
   // MESH
   // ============================================================
 
   const geometry =
-    new THREE.PlaneGeometry(1, 1);
+    new THREE.PlaneGeometry(
+      1,
+      1
+    );
 
   const mesh =
     new THREE.InstancedMesh(
@@ -587,8 +549,9 @@ export function createSimulation({
 
   scene.add(mesh);
 
+
   // ============================================================
-  // RESET
+  // CONTROLS
   // ============================================================
 
   function reset() {
@@ -599,10 +562,6 @@ export function createSimulation({
 
   }
 
-  // ============================================================
-  // STEP
-  // ============================================================
-
   function stepSimulation() {
 
     renderer.compute(
@@ -610,10 +569,6 @@ export function createSimulation({
     );
 
   }
-
-  // ============================================================
-  // DISPOSE
-  // ============================================================
 
   function dispose() {
 
@@ -624,6 +579,7 @@ export function createSimulation({
     scene.remove(mesh);
 
   }
+
 
   return {
     count,
