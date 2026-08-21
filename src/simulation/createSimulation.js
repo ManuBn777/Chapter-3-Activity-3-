@@ -14,7 +14,8 @@ import {
   uv,
   vec3,
   vec4,
-  sin
+  sin,
+  cos
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
@@ -34,12 +35,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica 3D inicial sólida
+    // Distribución esférica volumétrica 3D inicial
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    // Velocidad inicial activa para que nunca nazcan estáticas
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
@@ -52,28 +52,28 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Flujo fluido constante + Elasticidad suave)
+    // 1) MODO ESFERA (Olas fluidas continuas + Expansión por Beat)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // 1. Flujo senoidal orgánico y fuerte para mantener el movimiento constante
-      const sphereFlow = vec3(
-        sin(p.y.mul(2.0)),
-        sin(p.z.mul(2.0)),
-        sin(p.x.mul(2.0))
-      ).mul(2.5);
-      force.addAssign(sphereFlow.mul(params.sphereBlend));
+      // 1. Patrón de ondas fluidas constante para que las partículas fluyan por dentro como en el ejemplo visual
+      const waveFlow = vec3(
+        sin(p.y.mul(2.0).add(params.beat.mul(5.0))),
+        sin(p.z.mul(2.0).add(params.beat.mul(5.0))),
+        sin(p.x.mul(2.0).add(params.beat.mul(5.0)))
+      ).mul(4.0);
+      force.addAssign(waveFlow.mul(params.sphereBlend));
 
-      // 2. Radio objetivo controlado por el beat (B) con elasticidad moderada
+      // 2. Radio objetivo que se expande suavemente cuando se pulsa B y vuelve a su sitio
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
       const toCenterDir = p.normalize();
       const radiusDiff = distFromCenter.sub(targetRadius);
       
-      // Fuerza elástica suave (mucho más baja para permitir que fluyan libremente)
-      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(15.0));
-      force.addAssign(elasticForce.mul(params.sphereBlend));
+      // Fuerza de contención elástica suave para mantener la forma esférica sin frenar el flujo en seco
+      const containmentForce = toCenterDir.negate().mul(radiusDiff.mul(8.0));
+      force.addAssign(containmentForce.mul(params.sphereBlend));
 
-      // Fricción muy baja para conservar la inercia del movimiento
-      force.addAssign(v.mul(-0.5).mul(params.sphereBlend));
+      // Fricción muy baja para garantizar que sigan fluyendo sin atascarse
+      force.addAssign(v.mul(-0.2).mul(params.sphereBlend));
     });
 
     // ==========================================
