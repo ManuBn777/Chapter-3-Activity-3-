@@ -21,7 +21,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-const initParticles = Fn(() => {
+  const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
     const v = velocityBuffer.element(i);
@@ -34,12 +34,12 @@ const initParticles = Fn(() => {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución volumétrica uniforme en esfera 3D basada en dirección aleatoria y raíz cúbica del radio
+    // Distribución volumétrica tridimensional real (rellena todo el volumen de la esfera)
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
+    v.assign(vec3(0.0)); // Nacen completamente quietas, sin velocidad inicial aleatoria
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -49,52 +49,28 @@ const initParticles = Fn(() => {
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // 1) FUERZA RADIAL (CONTROLADA POR MOUSE) - Aislada para que no afecte el modo esfera
-    const effectiveAttractor = mix(params.attractor, vec3(0.0), params.sphereBlend);
-    const toAttractor = effectiveAttractor.sub(p);
-    const distance = max(toAttractor.length(), params.softening);
-    const radialDirection = toAttractor.div(distance);
-    
-    const radialForce = radialDirection
-      .mul(params.radialStrength)
-      .div(distance.pow(2))
-      .mul(params.radialEnabled)
-      .mul(params.sphereBlend.oneMinus()); 
-      
-    force.addAssign(radialForce);
-
     const distFromCenter = p.length();
 
-    // 2) MODO ESFERA: Giro interactivo (Q/W, A/S), bounce del beat y halo exterior flexible
-    const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
-    
+    // MODO ESFERA ESTÁTICA Y VOLUMÉTRICA (Sin aplanarse en aros)
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // A. ROTACIÓN INTERACTIVA (Controlada por spinDirection y spinSpeed)
-      const tangentDir = p.normalize().cross(vec3(0.0, 0.0, 1.0));
-      const orbitalForce = tangentDir.mul(params.spinDirection).mul(params.spinSpeed);
-      force.addAssign(orbitalForce.mul(params.sphereBlend));
-
-      // B. IMPULSO DINÁMICO DE B (Kick)
+      
+      // 1. Impulso sutil del Beat (expansión suave de toda la esfera sin romper el volumen)
       If(params.beat.greaterThan(0.01), () => {
-        const beatImpulse = p.normalize().mul(params.beat.mul(400.0));
+        const beatImpulse = p.normalize().mul(params.beat.mul(params.beatExpansion));
         force.addAssign(beatImpulse.mul(params.sphereBlend));
       });
 
-      // C. LÍMITE ORGÁNICO / ELÁSTICO (Permite un halo exterior flotante sin ser una esfera rígida)
-      If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const distanceDiff = distFromCenter.sub(effectiveRadius);
-        const elasticPull = p.normalize().negate().mul(distanceDiff.pow(1.1).mul(120.0));
-        force.addAssign(elasticPull.mul(params.sphereBlend));
+      // 2. Contención elástica suave para mantener el radio exacto de la esfera 3D
+      If(distFromCenter.greaterThan(params.baseRadius), () => {
+        const diff = distFromCenter.sub(params.baseRadius);
+        force.addAssign(p.normalize().negate().mul(diff.mul(50.0)).mul(params.sphereBlend));
       });
 
-      // D. CONTENCIÓN SUAVE INTERIOR (Evita colapso en el centro)
-      If(distFromCenter.lessThan(params.baseRadius.mul(0.5)), () => {
-        const innerPush = p.normalize().mul(params.baseRadius.mul(0.5).sub(distFromCenter)).mul(25.0);
-        force.addAssign(innerPush.mul(params.sphereBlend));
-      });
+      // 3. Amortiguación total (damping/drag fuerte) para que las partículas se queden quietas donde están
+      force.addAssign(v.mul(-10.0).mul(params.sphereBlend));
     });
 
-    // 3) MODO ARENA: Onda de choque clásica independiente del mouse
+    // MODO ARENA (Cuando sphereBlend es 0)
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
       const waveRadius = params.beat.mul(6.0);
@@ -104,48 +80,21 @@ const initParticles = Fn(() => {
         .mul(params.beat)
         .div(waveBand.add(0.2));
       force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
+
+      // Viento y fuerzas externas opcionales en modo arena
+      force.addAssign(params.wind.mul(params.windEnabled));
+      force.addAssign(v.mul(params.dragCoefficient).mul(-1.0));
     });
 
-    // 4) ESTÁTICA / ARENA (Tecla N)
-    const randomScatter = vec3(
-      hash(instanceIndex.add(uint(13))),
-      hash(instanceIndex.add(uint(23))),
-      hash(instanceIndex.add(uint(37)))
-    ).sub(0.5);
-
-    const rippleFreq = distFromCenter.mul(25.0);
-    const staticEffect = randomScatter
-      .mul(params.staticStrength)
-      .add(radialDirection.mul(sin(rippleFreq)).mul(2.0))
-      .mul(params.staticTrigger);
-      
-    force.addAssign(staticEffect);
-
-    // 5) CONSTANT / WIND FORCE & VORTEX
-    force.addAssign(params.wind.mul(params.windEnabled));
-
-    const zAxis = vec3(0.0, 0.0, 1.0);
-    const tangent = zAxis.cross(radialDirection);
-    force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
-
-    // 6) LINEAR DRAG
-    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(4.5), params.sphereBlend);
-    force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
-
-    // INTEGRATION
+    // Integración de movimiento
     v.addAssign(force.mul(dt));
-
-    const speed = v.length();
-    If(speed.greaterThan(params.maxSpeed), () => {
-      v.assign(v.normalize().mul(params.maxSpeed));
-    });
-
     p.addAssign(v.mul(dt));
 
-    // 7) LÍMITES PERIÓDICOS (Activos en modo arena)
+    // Límites periódicos solo activos en modo arena
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
+
   })().compute(count).setName('Update Particles');
 
   const material = new THREE.SpriteNodeMaterial({
