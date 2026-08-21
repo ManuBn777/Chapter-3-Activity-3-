@@ -51,7 +51,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Inercia sutil y volumen 3D sin compresión)
+    // 1) MODO ESFERA (Inercia sutil y volumen 3D)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
       const sphereFlow = vec3(
@@ -61,13 +61,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       ).mul(1.2);
       force.addAssign(sphereFlow.mul(params.sphereBlend));
 
-      // Solo frenamos suavemente si exceden el radio máximo, sin succionarlas de vuelta
-      If(distFromCenter.greaterThan(params.baseRadius.mul(1.3)), () => {
-        const diff = distFromCenter.sub(params.baseRadius.mul(1.3));
-        force.addAssign(p.normalize().negate().mul(diff.mul(20.0)).mul(params.sphereBlend));
-      });
-
-      force.addAssign(v.mul(-0.3).mul(params.sphereBlend));
+      // Amortiguación ligera en el modo esfera
+      force.addAssign(v.mul(-0.4).mul(params.sphereBlend));
     });
 
     // ==========================================
@@ -96,23 +91,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / THUMP (Expansión masiva sin contracción brusca)
+    // 3) BOTÓN B: KICK / SHOCKWAVE (Diferenciado por modo)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       const centerDir = p.normalize();
-      
-      const waveRadius = params.beat.mul(30.0);
-      const waveBand = distFromCenter.sub(waveRadius).abs();
-      
-      // Solo aplicamos fuerza hacia afuera (evitando valores negativos que compriman)
-      const kickShockwave = centerDir
-        .mul(params.beatStrength)
-        .mul(params.beat)
-        .mul(25.0)
-        .div(waveBand.add(0.1));
-      
-      force.addAssign(kickShockwave);
-      v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(70.0)));
+
+      // Kick exclusivo para MODO ESFERA: Expansión hacia fuera pura sin compresión posterior
+      If(params.sphereBlend.greaterThan(0.5), () => {
+        const sphereShockwave = centerDir
+          .mul(params.beatStrength)
+          .mul(params.beat)
+          .mul(30.0)
+          .div(distFromCenter.sub(params.beat.mul(15.0)).abs().add(0.2));
+        
+        force.addAssign(sphereShockwave.mul(params.sphereBlend));
+        v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(50.0)).mul(params.sphereBlend));
+      });
+
+      // Kick exclusivo para MODO ARENA: Onda de choque elástica original
+      If(params.sphereBlend.lessThan(0.5), () => {
+        const waveRadius = params.beat.mul(25.0);
+        const waveBand = distFromCenter.sub(waveRadius).abs();
+        const arenaShockwave = centerDir
+          .mul(params.beatStrength)
+          .mul(params.beat)
+          .mul(20.0)
+          .div(waveBand.add(0.1));
+        
+        force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
+      });
     });
 
     // ==========================================
