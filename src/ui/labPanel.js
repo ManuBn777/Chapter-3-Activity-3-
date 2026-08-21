@@ -1,7 +1,7 @@
-import * as dat from 'lil-gui';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange, onPauseChange }) {
-  const gui = new dat.GUI({ title: 'Laboratorio de Partículas' });
+  const gui = new GUI({ title: 'Laboratorio de Partículas' });
 
   // Controles de Estado y Modos
   const actionsFolder = gui.addFolder('Acciones y Modos');
