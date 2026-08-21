@@ -8,97 +8,131 @@ import {
   instancedArray,
   max,
   mix,
+  mod,
+  step,
+  uint,
+  uv,
+  vec3,
+  vec4,
   sin
 } from 'three/tsl';
 
-export function createSimulation({
-  renderer,
-  scene,
-  params,
-  count = 131072
-}) {
-
-  // ============================================================
-  // BUFFERS (Storage Buffers en GPU)
-  // ============================================================
-
+export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
-
-  // ============================================================
-  // INITIALIZE COMPUTATION
-  // ============================================================
 
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
     const v = velocityBuffer.element(i);
 
-    const r1 = hash(i.add(11));
-    const r2 = hash(i.add(23));
-    const r3 = hash(i.add(37));
-    const r4 = hash(i.add(53));
-    const r5 = hash(i.add(71));
-    const r6 = hash(i.add(89));
-    const r7 = hash(i.add(107));
+    const r1 = hash(i.add(uint(11)));
+    const r2 = hash(i.add(uint(23)));
+    const r3 = hash(i.add(uint(37)));
+    const r4 = hash(i.add(uint(53)));
+    const r5 = hash(i.add(uint(71)));
+    const r6 = hash(i.add(uint(89)));
+    const r7 = hash(i.add(uint(107)));
 
-    const direction = vec3(r1, r2, r3).sub(0.5).normalize();
-    const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius.mul(0.95));
+    const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
+    const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
 
-    p.assign(direction.mul(radius));
+    p.assign(spawnDirection.mul(spawnRadius));
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
-
   })().compute(count).setName('Initialize Particles');
 
-  // ============================================================
-  // UPDATE COMPUTATION
-  // ============================================================
-
   const updateParticles = Fn(() => {
-    const i = instanceIndex;
-    const p = positionBuffer.element(i);
-    const v = velocityBuffer.element(i);
+    const p = positionBuffer.element(instanceIndex);
+    const v = velocityBuffer.element(instanceIndex);
 
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    const dist = max(p.length(), 0.001);
-    const normal = p.div(dist);
+    // 1) FUERZA RADIAL (CONTROLADA POR MOUSE) - Aislada para que no afecte el modo esfera
+    const effectiveAttractor = mix(params.attractor, vec3(0.0), params.sphereBlend);
+    const toAttractor = effectiveAttractor.sub(p);
+    const distance = max(toAttractor.length(), params.softening);
+    const radialDirection = toAttractor.div(distance);
+    
+    const radialForce = radialDirection
+      .mul(params.radialStrength)
+      .div(distance.pow(2))
+      .mul(params.radialEnabled)
+      .mul(params.sphereBlend.oneMinus()); 
+      
+    force.addAssign(radialForce);
 
-    // 1. Movimiento interno (esfera)
-    const internalFlow = vec3(
-      p.y.negate(),
-      p.x,
-      sin(p.z.mul(2.7))
-    ).mul(0.18);
+    const distFromCenter = p.length();
 
-    force.addAssign(internalFlow.mul(params.sphereBlend));
+    // 2) MODO ESFERA: Giro interactivo (Q/W, A/S), bounce del beat y halo exterior flexible
+    const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
+    
+    If(params.sphereBlend.greaterThan(0.01), () => {
+      // A. ROTACIÓN INTERACTIVA (Controlada por spinDirection y spinSpeed)
+      const tangentDir = p.normalize().cross(vec3(0.0, 0.0, 1.0));
+      const orbitalForce = tangentDir.mul(params.spinDirection).mul(params.spinSpeed);
+      force.addAssign(orbitalForce.mul(params.sphereBlend));
 
-    // 2. Flujo de profundidad
-    const depthFlow = vec3(
-      sin(p.y.mul(2.1)),
-      sin(p.z.mul(1.7)),
-      sin(p.x.mul(2.4))
-    ).mul(0.10);
+      // B. IMPULSO DINÁMICO DE B (Kick)
+      If(params.beat.greaterThan(0.01), () => {
+        const beatImpulse = p.normalize().mul(params.beat.mul(400.0));
+        force.addAssign(beatImpulse.mul(params.sphereBlend));
+      });
 
-    force.addAssign(depthFlow.mul(params.sphereBlend));
+      // C. LÍMITE ORGÁNICO / ELÁSTICO (Permite un halo exterior flotante sin ser una esfera rígida)
+      If(distFromCenter.greaterThan(effectiveRadius), () => {
+        const distanceDiff = distFromCenter.sub(effectiveRadius);
+        const elasticPull = p.normalize().negate().mul(distanceDiff.pow(1.1).mul(120.0));
+        force.addAssign(elasticPull.mul(params.sphereBlend));
+      });
 
-    // 3. B — Thump / Pulso
-    If(params.beat.greaterThan(0.001), () => {
-      const kickScale = vec3(1.0).add(params.beat.mul(params.kickAmount));
-      p.assign(p.mul(mix(vec3(1.0), kickScale, params.sphereBlend)));
+      // D. CONTENCIÓN SUAVE INTERIOR (Evita colapso en el centro)
+      If(distFromCenter.lessThan(params.baseRadius.mul(0.5)), () => {
+        const innerPush = p.normalize().mul(params.baseRadius.mul(0.5).sub(distFromCenter)).mul(25.0);
+        force.addAssign(innerPush.mul(params.sphereBlend));
+      });
     });
 
-    // 4. Contención suave
-    const maxRadius = params.baseRadius.mul(1.15);
-    If(dist.greaterThan(maxRadius), () => {
-      const excess = dist.sub(maxRadius);
-      force.subAssign(normal.mul(excess.mul(4.0)));
+    // 3) MODO ARENA: Onda de choque clásica independiente del mouse
+    If(params.sphereBlend.lessThan(0.99), () => {
+      const centerDir = p.normalize();
+      const waveRadius = params.beat.mul(6.0);
+      const waveBand = distFromCenter.sub(waveRadius).abs();
+      const arenaShockwave = centerDir
+        .mul(params.beatStrength)
+        .mul(params.beat)
+        .div(waveBand.add(0.2));
+      force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
     });
 
-    // 5. Integración
+    // 4) ESTÁTICA / ARENA (Tecla N)
+    const randomScatter = vec3(
+      hash(instanceIndex.add(uint(13))),
+      hash(instanceIndex.add(uint(23))),
+      hash(instanceIndex.add(uint(37)))
+    ).sub(0.5);
+
+    const rippleFreq = distFromCenter.mul(25.0);
+    const staticEffect = randomScatter
+      .mul(params.staticStrength)
+      .add(radialDirection.mul(sin(rippleFreq)).mul(2.0))
+      .mul(params.staticTrigger);
+      
+    force.addAssign(staticEffect);
+
+    // 5) CONSTANT / WIND FORCE & VORTEX
+    force.addAssign(params.wind.mul(params.windEnabled));
+
+    const zAxis = vec3(0.0, 0.0, 1.0);
+    const tangent = zAxis.cross(radialDirection);
+    force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
+
+    // 6) LINEAR DRAG
+    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(4.5), params.sphereBlend);
+    force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
+
+    // INTEGRATION
     v.addAssign(force.mul(dt));
-    v.assign(v.mul(0.98)); // Drag
 
     const speed = v.length();
     If(speed.greaterThan(params.maxSpeed), () => {
@@ -107,49 +141,56 @@ export function createSimulation({
 
     p.addAssign(v.mul(dt));
 
+    // 7) LÍMITES PERIÓDICOS (Activos en modo arena)
+    const half = params.boundsSize.mul(0.5);
+    const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
+    p.assign(mix(wrappedPos, p, params.sphereBlend));
   })().compute(count).setName('Update Particles');
 
-  // ============================================================
-  // RENDER MESH SETUP
-  // ============================================================
-
-  const particleMaterial = new THREE.SpriteNodeMaterial({
-    transparent: true,
+  const material = new THREE.SpriteNodeMaterial({
+    blending: THREE.AdditiveBlending,
     depthWrite: false,
-    blending: THREE.AdditiveBlending
+    transparent: true
   });
 
-  // Vincular directamente el buffer de posición de la GPU al material
-  particleMaterial.positionNode = positionBuffer.element(instanceIndex);
-  particleMaterial.scaleNode = params.particleSize;
+  material.positionNode = positionBuffer.toAttribute();
+  material.scaleNode = params.particleSize;
 
-  particleMaterial.colorNode = mix(
-    color('#4fc3f7'),
-    color('#ff8a80'),
-    velocityBuffer.element(instanceIndex).length().div(params.maxSpeed)
-  );
+  material.colorNode = Fn(() => {
+    const speed = velocityBuffer.toAttribute().length();
+    const t = speed.div(params.maxSpeed).clamp(0.0, 1.0);
+    const slow = color('#46a6ff');
+    const fast = color('#ffb35a');
+    return vec4(mix(slow, fast, t), 1.0);
+  })();
 
-  const particleMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(1, 1),
-    particleMaterial,
-    count
-  );
+  material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
 
-  scene.add(particleMesh);
+  const geometry = new THREE.PlaneGeometry(1, 1);
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
 
-  // Ejecutar la inicialización inmediatamente en la GPU
-  renderer.compute(initParticles);
+  function reset() {
+    renderer.compute(initParticles);
+  }
 
-  // ============================================================
-  // API PUBLIC
-  // ============================================================
+  function stepSimulation() {
+    renderer.compute(updateParticles);
+  }
+
+  function dispose() {
+    geometry.dispose();
+    material.dispose();
+    scene.remove(mesh);
+  }
 
   return {
-    reset() {
-      renderer.compute(initParticles);
-    },
-    stepSimulation() {
-      renderer.compute(updateParticles);
-    }
+    count,
+    positionBuffer,
+    velocityBuffer,
+    reset,
+    stepSimulation,
+    dispose
   };
 }
