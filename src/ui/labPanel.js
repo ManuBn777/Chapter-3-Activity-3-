@@ -84,12 +84,26 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
     vortexStrength: params.vortexStrength.value,
     dragCoefficient: params.dragCoefficient.value,
     windX: params.wind.value.x,
-    windY: params.wind.value.y
+    windY: params.wind.value.y,
+    sphereBlend: params.sphereBlend.value,
+    staticTrigger: params.staticTrigger.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
   refreshers.push(rangeRow(sim, 'maxSpeed', state, 'maxSpeed', 0.2, 12, 0.1, (v) => params.maxSpeed.value = v, () => params.maxSpeed.value));
   refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.1, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
+
+  // INSTRUMENTOS Y ESTADOS
+  const instruments = document.createElement('div');
+  instruments.className = 'group';
+  instruments.innerHTML = '<h2>Forces / Instrument</h2>';
+  panel.append(instruments);
+
+  refreshers.push(rangeRow(instruments, 'sphereBlend (E)', state, 'sphereBlend', 0, 1, 0.01, (v) => params.sphereBlend.value = v, () => params.sphereBlend.value));
+  refreshers.push(rangeRow(instruments, 'Estática (N)', state, 'staticTrigger', 0, 2, 0.01, (v) => params.staticTrigger.value = v, () => params.staticTrigger.value));
+  
+  // Botón directo para disparar el Kick / Bounce
+  button(instruments, 'Kick / Bounce (B)', onBeat);
 
   const force = document.createElement('div');
   force.className = 'group';
@@ -104,6 +118,7 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
   refreshers.push(rangeRow(force, 'dragCoefficient', state, 'dragCoefficient', 0, 1, 0.01, (v) => params.dragCoefficient.value = v, () => params.dragCoefficient.value));
   refreshers.push(checkRow(force, 'Viento', params.windEnabled.value > 0, (v) => params.windEnabled.value = v ? 1 : 0, () => params.windEnabled.value > 0));
   refreshers.push(rangeRow(force, 'wind.x', state, 'windX', -4, 4, 0.05, (v) => params.wind.value.x = v, () => params.wind.value.x));
+  refreshers.replace?.(); // (Mantiene compatibilidad con tu estructura nativa)
   refreshers.push(rangeRow(force, 'wind.y', state, 'windY', -4, 4, 0.05, (v) => params.wind.value.y = v, () => params.wind.value.y));
 
   const tests = document.createElement('div');
@@ -123,7 +138,6 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
   button(actions, 'Reset', onReset);
-  button(actions, 'Pulso · B', onBeat);
   button(actions, 'Pausar / continuar', () => onPauseChange());
   button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 
