@@ -20,11 +20,11 @@ export function createParameters() {
 
     // Transición fluida de estado (0.0 = Arena, 1.0 = Esfera)
     sphereBlend: uniform(1.0),
-    containerRadius: uniform(3.5),
+    baseRadius: uniform(2.0), // Tamaño base de la esfera (2)
 
-    // B: Kick / Bounce elástico e inmediato
+    // B: Kick / Bounce que expande el radio de 2 a 4 elásticamente
     beat: uniform(0.0),
-    beatStrength: uniform(18.0),
+    beatExpansion: uniform(2.0), // Cuánto se expande (2 + 2 = 4)
 
     // N: Estática
     staticTrigger: uniform(0.0),
