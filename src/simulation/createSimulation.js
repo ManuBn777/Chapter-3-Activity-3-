@@ -13,7 +13,9 @@ import {
   uint,
   uv,
   vec3,
-  vec4
+  vec4,
+  sin,
+  cos
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
@@ -68,18 +70,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) THUMP / GLOBAL CONTAINER KICK:
-    // Generamos un desplazamiento global basado en hash/índice combinado con el beat,
-    // haciendo que toda la caja/nube de partículas sufra una sacudida coherente y seca 
-    // (como el impacto físico de un bombo pegando en el recinto).
-    const shakeNoise = vec3(
-      hash(instanceIndex.add(uint(1))),
-      hash(instanceIndex.add(uint(2))),
-      hash(instanceIndex.add(uint(3)))
-    ).sub(0.5);
-
-    const globalKick = shakeNoise.mul(params.beatStrength).mul(params.beat);
-    force.addAssign(globalKick);
+    // 3) WATER DROPLET RIPPLE / TEMBLOR RÁPIDO:
+    // Una oscilación senoidal de altísima frecuencia basada en la distancia al centro 
+    // y multiplicada por el beat, simulando el impacto de la gota en agua quieta.
+    const rippleFreq = distance.mul(25.0); // Frecuencia de las ondas en el espacio
+    const rippleShake = radialDirection
+      .mul(sin(rippleFreq))
+      .mul(params.beatStrength)
+      .mul(params.beat);
+      
+    force.addAssign(rippleShake);
 
     // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
