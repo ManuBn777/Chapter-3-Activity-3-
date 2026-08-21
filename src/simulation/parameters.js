@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
++import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 export function createParameters() {
   return {
