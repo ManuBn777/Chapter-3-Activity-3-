@@ -64,33 +64,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-// 2) MODO ESFERA: Bounce masivo, elástico y de largo recorrido
+// 2) MODO ESFERA: Estable por defecto, rota suave y rebota libre al pulsar B
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // A. ROTATION: Inercia circular fluida
-      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.6);
+      // A. ROTACIÓN CONSTANTE Y FLUIDA (Nunca se congela)
+      // Mantiene el flujo circular vivo en todo momento
+      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(1.2);
       force.addAssign(rotation.mul(params.sphereBlend));
 
-      // B. KICK / EXPANSION: Impulso masivo hacia afuera al pulsar B
-      const beatImpulse = p.normalize().mul(params.beat.mul(650.0));
-      force.addAssign(beatImpulse.mul(params.sphereBlend));
+      // B. IMPULSO DINÁMICO DE B (Solo actúa cuando pulsas B, de forma limpia)
+      If(params.beat.greaterThan(0.01), () => {
+        const beatImpulse = p.normalize().mul(params.beat.mul(400.0));
+        force.addAssign(beatImpulse.mul(params.sphereBlend));
+      });
 
-      // C. RESORTE ELÁSTICO LARGO (Adiós al freno seco)
-      // En lugar de una pared rígida, usamos una fuerza tipo Hooke muy elástica.
-      // Cuanto más se alejan del radio efectivo, más fuerte es el tirón de regreso, 
-      // pero con suficiente inercia para que "se pasen de largo" y respiren.
-      const distanceDiff = distFromCenter.sub(effectiveRadius);
-      
-      // Si la distancia es mayor al radio, un resorte suave pero potente las atrae de vuelta
+      // C. RESORTE ELÁSTICO DEL BOUNCE (Largo y potente)
       If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const elasticPull = p.normalize().negate().mul(distanceDiff.pow(1.2).mul(350.0));
+        const distanceDiff = distFromCenter.sub(effectiveRadius);
+        const elasticPull = p.normalize().negate().mul(distanceDiff.mul(450.0));
         force.addAssign(elasticPull.mul(params.sphereBlend));
       });
 
-      // D. COMPRESIÓN ORGÁNICA: Mantiene la esfera unida pero con juego elástico
-      const organicPull = p.negate().mul(distFromCenter.mul(1.5));
-      force.addAssign(organicPull.mul(params.sphereBlend.oneMinus().or(params.beat.oneMinus())));
+      // D. CONTENCIÓN ESTABLE (Adiós a la respiración fantasma)
+      // Mantiene el tamaño base fijo y ordenado cuando no hay música/beats, 
+      // evitando que se comprima o expanda sola.
+      If(distFromCenter.lessThan(params.baseRadius), () => {
+        const innerPush = p.normalize().mul(params.baseRadius.sub(distFromCenter)).mul(15.0);
+        force.addAssign(innerPush.mul(params.sphereBlend));
+      });
     });
     
     // 3) MODO ARENA: Onda de choque clásica independiente del mouse
