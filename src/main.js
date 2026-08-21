@@ -101,7 +101,6 @@ async function main() {
   const clock = new THREE.Clock();
 
   const triggerBeat = () => {
-    params.rippleEnabled.value = 1;
     params.beat.value = 1.0;
   };
 
@@ -110,7 +109,6 @@ async function main() {
     params.radialEnabled.value = 0;
     params.vortexEnabled.value = 0;
     params.dragEnabled.value = 0;
-    params.rippleEnabled.value = 0;
     params.wind.value.set(0, 0, 0);
     params.initialSpeed.value = 0;
 
@@ -132,10 +130,6 @@ async function main() {
       params.vortexStrength.value = 3.0;
       params.dragEnabled.value = 1;
       params.dragCoefficient.value = 0.08;
-    } else if (id === 'ripple') {
-      params.rippleEnabled.value = 1;
-      params.dragEnabled.value = 1;
-      params.dragCoefficient.value = 0.55;
     }
     simulation.reset();
     panel?.refresh();
@@ -182,7 +176,6 @@ async function main() {
     if (event.code === 'Digit3') applyPreset('attract');
     if (event.code === 'Digit4') applyPreset('repel');
     if (event.code === 'Digit5') applyPreset('vortex');
-    if (event.code === 'Digit6') applyPreset('ripple');
     if (event.code === 'KeyB') triggerBeat();
 
     if (event.code === 'Space') {
@@ -214,7 +207,7 @@ async function main() {
   // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-    params.beat.value = Math.max(0, params.beat.value - delta * 1.1);
+    params.beat.value = Math.max(0, params.beat.value - delta * 0.65);
 
     if (!paused) simulation.stepSimulation();
     orbit.update();
