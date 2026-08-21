@@ -20,9 +20,9 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // B triggers this short manual outward pulse.
+    // B triggers one short manual kick outward.
     beat: uniform(0.0),
-    beatStrength: uniform(4.0),
+    beatStrength: uniform(40.0),
 
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),

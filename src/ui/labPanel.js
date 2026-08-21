@@ -123,7 +123,7 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
   button(actions, 'Reset', onReset);
-  button(actions, 'Pulso · B', onBeat);
+  button(actions, 'Beat · B', onBeat);
   button(actions, 'Pausar / continuar', () => onPauseChange());
   button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 

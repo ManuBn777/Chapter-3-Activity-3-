@@ -68,8 +68,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) MANUAL BEAT: temporary repulsion from the attractor.
-    // When it fades, the normal radial attraction and drag take over again.
+    // 3) MANUAL BEAT: one short kick away from the attractor.
+    // The later motion and return emerge from the system's existing forces.
     force.addAssign(
       radialDirection.mul(params.beatStrength).mul(-1.0).mul(params.beat)
     );
