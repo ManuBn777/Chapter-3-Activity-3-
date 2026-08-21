@@ -20,6 +20,10 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
+    // Transient outward impulse, triggered manually with the beat control.
+    beat: uniform(0.0),
+    beatStrength: uniform(14.0),
+
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
 
