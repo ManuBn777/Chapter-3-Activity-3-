@@ -117,6 +117,7 @@ async function main() {
     onReset: () => simulation.reset(),
     onPreset: applyPreset,
     onBeat: triggerBeat,
+    onStatic: triggerStatic,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => paused = !paused
   });
@@ -131,18 +132,22 @@ async function main() {
     if (event.code === 'KeyN') triggerStatic();
     if (event.code === 'KeyE') toggleStateMode();
 
-    // Controles de Órbita y Giro (Q/W y A/S)
+    // Controles interactivos de Órbita y Giro con actualización del panel
     if (event.code === 'KeyQ') {
-      params.spinDirection.value = -1.0; // Giro a la izquierda
+      params.spinDirection.value = -1.0;
+      panel.refresh();
     }
     if (event.code === 'KeyW') {
-      params.spinDirection.value = 1.0;  // Giro a la derecha
+      params.spinDirection.value = 1.0;
+      panel.refresh();
     }
     if (event.code === 'KeyA') {
-      params.spinSpeed.value = Math.max(0.0, params.spinSpeed.value - 0.5); // Reducir velocidad
+      params.spinSpeed.value = Math.max(0.0, params.spinSpeed.value - 0.5);
+      panel.refresh();
     }
     if (event.code === 'KeyS') {
-      params.spinSpeed.value = Math.min(5.0, params.spinSpeed.value + 0.5); // Aumentar velocidad
+      params.spinSpeed.value = Math.min(5.0, params.spinSpeed.value + 0.5);
+      panel.refresh();
     }
   });
 
