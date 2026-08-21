@@ -64,37 +64,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-// 2) MODO ESFERA: Estable por defecto, rota suave y rebota libre al pulsar B
+    // 2) MODO ESFERA: Giro interactivo (Q/W, A/S), bounce del beat y halo exterior flexible
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // A. ROTACIÓN CONSTANTE Y FLUIDA (Nunca se congela)
-      // Mantiene el flujo circular vivo en todo momento
-      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(1.2);
-      force.addAssign(rotation.mul(params.sphereBlend));
+      // A. ROTACIÓN INTERACTIVA (Controlada por spinDirection y spinSpeed)
+      const tangentDir = p.normalize().cross(vec3(0.0, 0.0, 1.0));
+      const orbitalForce = tangentDir.mul(params.spinDirection).mul(params.spinSpeed);
+      force.addAssign(orbitalForce.mul(params.sphereBlend));
 
-      // B. IMPULSO DINÁMICO DE B (Solo actúa cuando pulsas B, de forma limpia)
+      // B. IMPULSO DINÁMICO DE B (Kick)
       If(params.beat.greaterThan(0.01), () => {
         const beatImpulse = p.normalize().mul(params.beat.mul(400.0));
         force.addAssign(beatImpulse.mul(params.sphereBlend));
       });
 
-      // C. RESORTE ELÁSTICO DEL BOUNCE (Largo y potente)
+      // C. LÍMITE ORGÁNICO / ELÁSTICO (Permite un halo exterior flotante sin ser una esfera rígida)
       If(distFromCenter.greaterThan(effectiveRadius), () => {
         const distanceDiff = distFromCenter.sub(effectiveRadius);
-        const elasticPull = p.normalize().negate().mul(distanceDiff.mul(450.0));
+        const elasticPull = p.normalize().negate().mul(distanceDiff.pow(1.1).mul(120.0));
         force.addAssign(elasticPull.mul(params.sphereBlend));
       });
 
-      // D. CONTENCIÓN ESTABLE (Adiós a la respiración fantasma)
-      // Mantiene el tamaño base fijo y ordenado cuando no hay música/beats, 
-      // evitando que se comprima o expanda sola.
-      If(distFromCenter.lessThan(params.baseRadius), () => {
-        const innerPush = p.normalize().mul(params.baseRadius.sub(distFromCenter)).mul(15.0);
+      // D. CONTENCIÓN SUAVE INTERIOR (Evita colapso en el centro)
+      If(distFromCenter.lessThan(params.baseRadius.mul(0.5)), () => {
+        const innerPush = p.normalize().mul(params.baseRadius.mul(0.5).sub(distFromCenter)).mul(25.0);
         force.addAssign(innerPush.mul(params.sphereBlend));
       });
     });
-    
+
     // 3) MODO ARENA: Onda de choque clásica independiente del mouse
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
@@ -129,7 +127,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 6) LINEAR DRAG (Mantiene la esfera limpia)
+    // 6) LINEAR DRAG
     const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(4.5), params.sphereBlend);
     force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
