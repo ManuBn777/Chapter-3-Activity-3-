@@ -51,18 +51,19 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Inercia sutil y volumen 3D)
+    // 1) MODO ESFERA (Flujo dinámico continuo sin contracción)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
+      // Flujo interno orgánico constante para que nunca se queden quietas
       const sphereFlow = vec3(
         sin(p.y.mul(1.5)),
         sin(p.z.mul(1.5)),
         sin(p.x.mul(1.5))
-      ).mul(1.2);
+      ).mul(1.5);
       force.addAssign(sphereFlow.mul(params.sphereBlend));
 
-      // Amortiguación ligera en el modo esfera
-      force.addAssign(v.mul(-0.4).mul(params.sphereBlend));
+      // Amortiguación suave para estabilizar velocidad sin tirones hacia adentro
+      force.addAssign(v.mul(-0.2).mul(params.sphereBlend));
     });
 
     // ==========================================
@@ -96,19 +97,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     If(params.beat.greaterThan(0.01), () => {
       const centerDir = p.normalize();
 
-      // Kick exclusivo para MODO ESFERA: Expansión hacia fuera pura sin compresión posterior
+      // Kick para MODO ESFERA: Shockwave de expansión pura hacia afuera, sin compresión ni freno interior
       If(params.sphereBlend.greaterThan(0.5), () => {
-        const sphereShockwave = centerDir
-          .mul(params.beatStrength)
-          .mul(params.beat)
-          .mul(30.0)
-          .div(distFromCenter.sub(params.beat.mul(15.0)).abs().add(0.2));
-        
-        force.addAssign(sphereShockwave.mul(params.sphereBlend));
-        v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(50.0)).mul(params.sphereBlend));
+        // Impulso de velocidad directo hacia afuera que respeta el flujo general
+        v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(45.0)).mul(params.sphereBlend));
       });
 
-      // Kick exclusivo para MODO ARENA: Onda de choque elástica original
+      // Kick para MODO ARENA: Onda de choque elástica original
       If(params.sphereBlend.lessThan(0.5), () => {
         const waveRadius = params.beat.mul(25.0);
         const waveBand = distFromCenter.sub(waveRadius).abs();
