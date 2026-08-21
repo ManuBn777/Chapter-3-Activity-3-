@@ -18,7 +18,7 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // Estados estructurales: 0.0 = Arena (libre), 1.0 = Esfera (contenedora estática)
+    // Estado estructural: 0.0 = Arena (libre), 1.0 = Esfera (contenedora estática)
     stateMode: uniform(1.0), 
     containerRadius: uniform(3.5),
 
