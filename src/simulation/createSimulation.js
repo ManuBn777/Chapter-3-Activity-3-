@@ -52,10 +52,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Olas fluidas continuas + Expansión por Beat)
+    // 1) MODO ESFERA (Olas fluidas + Expansión por Beat + Giro Q/W)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // 1. Patrón de ondas fluidas constante para que las partículas fluyan por dentro como en el ejemplo visual
+      // 1. Patrón de ondas fluidas constante
       const waveFlow = vec3(
         sin(p.y.mul(2.0).add(params.beat.mul(5.0))),
         sin(p.z.mul(2.0).add(params.beat.mul(5.0))),
@@ -63,16 +63,23 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       ).mul(4.0);
       force.addAssign(waveFlow.mul(params.sphereBlend));
 
-      // 2. Radio objetivo que se expande suavemente cuando se pulsa B y vuelve a su sitio
+      // 2. Control de giro con Q (izquierda) y W (derecha) alrededor del eje Y
+      // params.spinDirection asume valores negativos para Q e positivos para W (o viceversa según se configure)
+      const rotationAxis = vec3(0.0, 1.0, 0.0);
+      const tangentDir = rotationAxis.cross(p);
+      const spinForce = tangentDir.mul(params.spinDirection).mul(3.0);
+      force.addAssign(spinForce.mul(params.sphereBlend));
+
+      // 3. Radio objetivo que se expande suavemente con B
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
       const toCenterDir = p.normalize();
       const radiusDiff = distFromCenter.sub(targetRadius);
       
-      // Fuerza de contención elástica suave para mantener la forma esférica sin frenar el flujo en seco
+      // Fuerza de contención elástica suave
       const containmentForce = toCenterDir.negate().mul(radiusDiff.mul(8.0));
       force.addAssign(containmentForce.mul(params.sphereBlend));
 
-      // Fricción muy baja para garantizar que sigan fluyendo sin atascarse
+      // Fricción baja para conservar fluidez e inercia de giro
       force.addAssign(v.mul(-0.2).mul(params.sphereBlend));
     });
 
