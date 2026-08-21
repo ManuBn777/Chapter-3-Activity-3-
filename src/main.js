@@ -36,6 +36,7 @@ async function main() {
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
+  // Elementos visuales
   const attractorHelper = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 16, 12),
     new THREE.MeshBasicMaterial({ color: '#ffffff' })
@@ -44,13 +45,7 @@ async function main() {
 
   const performanceGuide = new THREE.Mesh(
     new THREE.RingGeometry(0.13, 0.15, 48),
-    new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    })
+    new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })
   );
   performanceGuide.visible = false;
   scene.add(performanceGuide);
@@ -58,6 +53,7 @@ async function main() {
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
+  // Interacción
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -74,16 +70,14 @@ async function main() {
     }
   });
 
+  // Estado y lógica
   let paused = false;
   let mode = 'LAB';
-  let panel;
-  let targetSphereBlend = 1.0;
-  let savedRadialStrength = params.radialStrength.value;
-  let savedRadialEnabled = params.radialEnabled.value;
+  let targetSphereBlend = 1.0; // 1.0 = Esfera, 0.0 = Arena
   const clock = new THREE.Clock();
 
   const triggerBeat = () => {
-    params.beat.value = 1.0; // Dispara el impulso máximo de expansión (de 2 a 4)
+    params.beat.value = 1.0; // Disparo del Kick
   };
 
   const triggerStatic = () => {
@@ -102,27 +96,13 @@ async function main() {
     params.wind.value.set(0, 0, 0);
     params.initialSpeed.value = 0;
 
-    if (id === 'inertia') {
-      params.initialSpeed.value = 0.8;
-    } else if (id === 'wind') {
-      params.windEnabled.value = 1;
-      params.wind.value.set(1.5, 0, 0);
-    } else if (id === 'attract') {
-      params.radialEnabled.value = 1;
-      params.radialStrength.value = 3.0;
-    } else if (id === 'repel') {
-      params.radialEnabled.value = 1;
-      params.radialStrength.value = -3.0;
-    } else if (id === 'vortex') {
-      params.radialEnabled.value = 1;
-      params.radialStrength.value = 1.0;
-      params.vortexEnabled.value = 1;
-      params.vortexStrength.value = 3.0;
-      params.dragEnabled.value = 1;
-      params.dragCoefficient.value = 0.08;
-    }
+    if (id === 'inertia') params.initialSpeed.value = 0.8;
+    else if (id === 'wind') { params.windEnabled.value = 1; params.wind.value.set(1.5, 0, 0); }
+    else if (id === 'attract') { params.radialEnabled.value = 1; params.radialStrength.value = 3.0; }
+    else if (id === 'repel') { params.radialEnabled.value = 1; params.radialStrength.value = -3.0; }
+    else if (id === 'vortex') { params.radialEnabled.value = 1; params.radialStrength.value = 1.0; params.vortexEnabled.value = 1; params.vortexStrength.value = 3.0; params.dragEnabled.value = 1; params.dragCoefficient.value = 0.08; }
+    
     simulation.reset();
-    panel?.refresh();
   };
 
   const setMode = (next) => {
@@ -133,12 +113,9 @@ async function main() {
     axes.visible = lab;
     attractorHelper.visible = lab;
     performanceGuide.visible = !lab;
-    hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: perf · R: reset · B: kick/bounce · N: estática · E: esfera/arena fluida'
-      : '';
   };
 
-  panel = createLabPanel({
+  const panel = createLabPanel({
     params,
     onReset: () => simulation.reset(),
     onPreset: applyPreset,
@@ -147,38 +124,16 @@ async function main() {
     onPauseChange: () => paused = !paused
   });
 
-  const hud = document.createElement('div');
-  hud.className = 'hud';
-  document.body.append(hud);
   setMode('LAB');
 
+  // Listeners
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     if (event.code === 'KeyR') simulation.reset();
-    if (event.code === 'Digit1') applyPreset('inertia');
-    if (event.code === 'Digit2') applyPreset('wind');
-    if (event.code === 'Digit3') applyPreset('attract');
-    if (event.code === 'Digit4') applyPreset('repel');
-    if (event.code === 'Digit5') applyPreset('vortex');
     if (event.code === 'KeyB') triggerBeat();
     if (event.code === 'KeyN') triggerStatic();
     if (event.code === 'KeyE') toggleStateMode();
-
-    if (event.code === 'Space') {
-      event.preventDefault();
-      savedRadialStrength = params.radialStrength.value;
-      savedRadialEnabled = params.radialEnabled.value;
-      params.radialEnabled.value = 1;
-      params.radialStrength.value = -(savedRadialStrength || 2.0);
-    }
-  });
-
-  addEventListener('keyup', (event) => {
-    if (event.code === 'Space') {
-      params.radialEnabled.value = savedRadialEnabled;
-      params.radialStrength.value = savedRadialStrength;
-    }
   });
 
   addEventListener('resize', () => {
@@ -192,12 +147,11 @@ async function main() {
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
     
-    // Interpolar fluidamente el blend de la esfera / arena
-    const blendDiff = targetSphereBlend - params.sphereBlend.value;
-    params.sphereBlend.value += blendDiff * Math.min(1.0, delta * 4.0);
+    // Interpolar fluidamente el blend entre Esfera y Arena
+    params.sphereBlend.value += (targetSphereBlend - params.sphereBlend.value) * Math.min(1.0, delta * 4.0);
 
-    // Decaimiento rápido del kick (hace el rebote elástico de 2 a 4 y regresa de golpe a 2)
-    params.beat.value = Math.max(0, params.beat.value - delta * 9.0);
+    // Decaimiento rápido del Kick (Rebote elástico) y de la Estática
+    params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
@@ -206,10 +160,4 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error(error);
-  const pre = document.createElement('pre');
-  pre.style.cssText = 'position:fixed;inset:16px;white-space:pre-wrap;color:#fff;z-index:50';
-  pre.textContent = String(error?.stack || error);
-  document.body.append(pre);
-});
+main().catch(console.error);
