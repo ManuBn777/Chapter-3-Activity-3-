@@ -61,7 +61,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         sin(p.z.mul(2.0).add(params.beat.mul(5.0))),
         sin(p.x.mul(2.0).add(params.beat.mul(5.0)))
       ).mul(4.0);
-      force.addAssign(waveFlow.mul(params.sphereBlend));
+      //force.addAssign(waveFlow.mul(params.sphereBlend));
 
       // Control de giro con Q y W (dirección) + A y S (velocidad)
       const rotationAxis = vec3(0.0, 1.0, 0.0);
