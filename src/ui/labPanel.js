@@ -88,7 +88,8 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
     sphereBlend: params.sphereBlend.value,
     staticTrigger: params.staticTrigger.value,
     spinDirection: params.spinDirection.value,
-    spinSpeed: params.spinSpeed.value
+    spinSpeed: params.spinSpeed.value,
+    beatDecay: params.beatDecay.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -103,11 +104,12 @@ export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange
 
   refreshers.push(rangeRow(instruments, 'sphereBlend (E)', state, 'sphereBlend', 0, 1, 0.01, (v) => params.sphereBlend.value = v, () => params.sphereBlend.value));
   refreshers.push(rangeRow(instruments, 'Estática (N)', state, 'staticTrigger', 0, 2, 0.01, (v) => params.staticTrigger.value = v, () => params.staticTrigger.value));
-  
-  // Nuevos controles de Órbita y Giro (Q/W y A/S)
+
+  // Controles de Órbita y Giro (Q/W y A/S)
   refreshers.push(rangeRow(instruments, 'Giro (Q/W)', state, 'spinDirection', -1, 1, 2, (v) => params.spinDirection.value = v, () => params.spinDirection.value));
   refreshers.push(rangeRow(instruments, 'Velocidad (A/S)', state, 'spinSpeed', 0, 5, 0.1, (v) => params.spinSpeed.value = v, () => params.spinSpeed.value));
 
+  refreshers.push(rangeRow(instruments, 'beatDecay (duración pulso)', state, 'beatDecay', 0.3, 4, 0.05, (v) => params.beatDecay.value = v, () => params.beatDecay.value));
   button(instruments, 'Kick / Bounce (B)', onBeat);
 
   const force = document.createElement('div');
