@@ -1,56 +1,54 @@
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 
-export function createLabPanel({ params, onReset, onPreset, onBeat, onModeChange, onPauseChange }) {
-  const gui = new GUI({ title: 'Laboratorio de Partículas' });
+export function setupLab({ params, simulation, scene, camera, renderer }) {
+  const gui = new GUI({ title: 'Control Panel - Particle Simulation' });
 
-  // Controles de Estado y Modos
-  const actionsFolder = gui.addFolder('Acciones y Modos');
-  
-  const stateObj = {
-    toggleMode: onModeChange,
-    triggerBeat: onBeat,
-    resetSim: onReset,
-    pauseSim: false
-  };
+  // Carpeta de Simulación General
+  const simFolder = gui.addFolder('General');
+  simFolder.add(params, 'timeScale', 0.0, 3.0, 0.01).name('Time Scale');
+  simFolder.add(params, 'maxSpeed', 1.0, 30.0, 0.1).name('Max Speed');
+  simFolder.add(params, 'particleSize', 0.01, 0.5, 0.01).name('Particle Size');
+  simFolder.add({ reset: () => simulation.reset() }, 'reset').name('Reset Particles');
 
-  actionsFolder.add(stateObj, 'toggleMode').name('Alternar Modo (P)');
-  actionsFolder.add(stateObj, 'triggerBeat').name('Impulso Beat (B)');
-  actionsFolder.add(stateObj, 'resetSim').name('Reiniciar (R)');
-  
-  const pauseController = actionsFolder.add(stateObj, 'pauseSim').name('Pausar Simulación');
-  pauseController.onChange((val) => {
-    if (onPauseChange) onPauseChange(val);
-  });
+  // Carpeta de Modo Esfera
+  const sphereFolder = gui.addFolder('Sphere Mode');
+  sphereFolder.add(params, 'sphereBlend', 0.0, 1.0, 0.01).name('Sphere Blend');
+  sphereFolder.add(params, 'baseRadius', 1.0, 8.0, 0.1).name('Base Radius');
+  sphereFolder.add(params, 'beatExpansion', 0.5, 5.0, 0.1).name('Beat Expansion');
 
-  // Presets de Física
-  const presetObj = {
-    preset: 'inertia',
-    apply: () => onPreset(presetObj.preset)
-  };
-  
-  const presetsFolder = gui.addFolder('Presets de Comportamiento');
-  presetsFolder.add(presetObj, 'preset', ['inertia', 'wind', 'attract', 'repel', 'vortex']).name('Preset');
-  presetsFolder.add(presetObj, 'apply').name('Aplicar Preset');
-
-  // Parámetros de Esfera y Giro
-  const sphereFolder = gui.addFolder('Configuración Esfera');
-  sphereFolder.add(params.baseRadius, 'value', 1.0, 8.0, 0.1).name('Radio Base');
-  sphereFolder.add(params.beatExpansion, 'value', 0.0, 4.0, 0.1).name('Expansión Beat');
-  sphereFolder.add(params.spinSpeed, 'value', 0.0, 5.0, 0.1).name('Velocidad Giro (A/S)');
-
-  // Parámetros Generales
-  const physicsFolder = gui.addFolder('Física General');
-  physicsFolder.add(params.timeScale, 'value', 0.0, 2.0, 0.05).name('Escala de Tiempo');
-  physicsFolder.add(params.maxSpeed, 'value', 1.0, 20.0, 0.5).name('Velocidad Máxima');
-  physicsFolder.add(params.particleSize, 'value', 0.01, 0.3, 0.01).name('Tamaño Partícula');
+  // Carpeta de Modo Arena / Fuerzas
+  const arenaFolder = gui.addFolder('Arena Forces');
+  arenaFolder.add(params, 'radialStrength', -20.0, 20.0, 0.1).name('Radial Strength');
+  arenaFolder.add(params, 'vortexStrength', 0.0, 10.0, 0.1).name('Vortex Strength');
+  arenaFolder.add(params, 'dragCoefficient', 0.0, 2.0, 0.01).name('Drag');
 
   gui.open();
 
+  // Control de eventos de teclado para B (Beat/Kick) y N (Estática)
+  let beatInterval = null;
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'b') {
+      // Simula un impulso rápido al pulsar B
+      params.beat = 1.0;
+    }
+    if (e.key.toLowerCase() === 'n') {
+      params.staticTrigger = 1.0;
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === 'b') {
+      params.beat = 0.0;
+    }
+    if (e.key.toLowerCase() === 'n') {
+      params.staticTrigger = 0.0;
+    }
+  });
+
   return {
-    setVisible: (visible) => {
-      if (visible) gui.show();
-      else gui.hide();
-    },
-    destroy: () => gui.destroy()
+    dispose: () => {
+      gui.destroy();
+    }
   };
 }
