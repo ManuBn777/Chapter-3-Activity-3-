@@ -95,26 +95,29 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / THUMP (Bombo potente de expansión y retorno)
+    // 3) BOTÓN B: KICK / THUMP (Bombo ultra potente de gran expansión)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       const centerDir = p.normalize();
-      // Ancho de banda y fuerza amplificados para simular el golpe de un bombo físico
-      const waveRadius = params.beat.mul(12.0);
+      // Rango de onda mucho más amplio y fuerza multiplicada drásticamente
+      const waveRadius = params.beat.mul(25.0);
       const waveBand = distFromCenter.sub(waveRadius).abs();
       const kickShockwave = centerDir
         .mul(params.beatStrength)
         .mul(params.beat)
-        .mul(3.5)
-        .div(waveBand.add(0.1));
+        .mul(12.0)
+        .div(waveBand.add(0.08));
+      
       force.addAssign(kickShockwave);
+      
+      // Impulso directo a la velocidad para que la expansión se note al instante
+      v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(40.5)));
     });
 
     // ==========================================
     // 4) BOTÓN N: ESTÁTICA / DISPERSIÓN FUERTE
     // ==========================================
     If(params.staticTrigger.greaterThan(0.01), () => {
-      // Vector aleatorio tridimensional de alta potencia para dispersar masivamente
       const randomScatter = vec3(
         hash(instanceIndex.add(uint(13))),
         hash(instanceIndex.add(uint(23))),
