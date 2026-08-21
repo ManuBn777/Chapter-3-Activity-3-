@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+iimport * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
 import './styles.css';
@@ -98,7 +98,7 @@ async function main() {
     else if (id === 'attract') { params.radialEnabled.value = 1; params.radialStrength.value = 3.0; }
     else if (id === 'repel') { params.radialEnabled.value = 1; params.radialStrength.value = -3.0; }
     else if (id === 'vortex') { params.radialEnabled.value = 1; params.radialStrength.value = 1.0; params.vortexEnabled.value = 1; params.vortexStrength.value = 3.0; params.dragEnabled.value = 1; params.dragCoefficient.value = 0.08; }
-
+    
     simulation.reset();
   };
 
@@ -145,6 +145,12 @@ async function main() {
     }
   });
 
+  addEventListener('keyup', (event) => {
+    if (event.code === 'KeyQ' || event.code === 'KeyW') {
+      params.spinDirection.value = 0.0;
+    }
+  });
+
   addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
@@ -155,9 +161,9 @@ async function main() {
 
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-
+    
     params.sphereBlend.value += (targetSphereBlend - params.sphereBlend.value) * Math.min(1.0, delta * 4.0);
-    params.beat.value = Math.max(0, params.beat.value - delta * params.beatDecay.value);
+    params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
