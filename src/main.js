@@ -145,6 +145,12 @@ async function main() {
     }
   });
 
+  addEventListener('keyup', (event) => {
+    if (event.code === 'KeyQ' || event.code === 'KeyW') {
+      params.spinDirection.value = 0.0;
+    }
+  });
+
   addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
