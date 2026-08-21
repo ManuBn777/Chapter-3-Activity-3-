@@ -29,6 +29,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
+    const r4 = hash(i.add(uint(53)));
+    const r5 = hash(i.add(uint(71)));
+    const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
     // Distribución esférica volumétrica 3D inicial sólida
@@ -36,7 +39,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(r1, r2, r3).sub(0.5).mul(params.initialSpeed));
+    // Velocidad inicial activa para que nunca nazcan estáticas
+    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -48,29 +52,28 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Flujo dinámico orgánico + Retorno elástico al radio)
+    // 1) MODO ESFERA (Flujo fluido constante + Elasticidad suave)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // 1. Flujo interno continuo para que las partículas nunca se queden estáticas
+      // 1. Flujo senoidal orgánico y fuerte para mantener el movimiento constante
       const sphereFlow = vec3(
-        sin(p.y.mul(1.5)),
-        sin(p.z.mul(1.5)),
-        sin(p.x.mul(1.5))
-      ).mul(1.2);
+        sin(p.y.mul(2.0)),
+        sin(p.z.mul(2.0)),
+        sin(p.x.mul(2.0))
+      ).mul(2.5);
       force.addAssign(sphereFlow.mul(params.sphereBlend));
 
-      // 2. Radio objetivo dinámico controlado por el beat (B)
+      // 2. Radio objetivo controlado por el beat (B) con elasticidad moderada
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
-      
       const toCenterDir = p.normalize();
       const radiusDiff = distFromCenter.sub(targetRadius);
       
-      // 3. Fuerza elástica que expande con el beat y regresa al tamaño base
-      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(100.0));
+      // Fuerza elástica suave (mucho más baja para permitir que fluyan libremente)
+      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(15.0));
       force.addAssign(elasticForce.mul(params.sphereBlend));
 
-      // 4. Amortiguación equilibrada para mantener fluidez sin descontrolar la velocidad
-      force.addAssign(v.mul(-2.0).mul(params.sphereBlend));
+      // Fricción muy baja para conservar la inercia del movimiento
+      force.addAssign(v.mul(-0.5).mul(params.sphereBlend));
     });
 
     // ==========================================
