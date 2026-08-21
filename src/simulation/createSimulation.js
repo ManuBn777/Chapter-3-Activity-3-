@@ -1,44 +1,84 @@
-const updateParticles = Fn(() => {
+import * as THREE from 'three/webgpu';
+import {
+  Fn,
+  If,
+  color,
+  hash,
+  instanceIndex,
+  instancedArray,
+  max,
+  mix,
+  mod,
+  step,
+  uint,
+  uv,
+  vec3,
+  vec4,
+  sin
+} from 'three/tsl';
+
+export function createSimulation({ renderer, scene, params, count = 131072 }) {
+  const positionBuffer = instancedArray(count, 'vec3');
+  const velocityBuffer = instancedArray(count, 'vec3');
+
+  const initParticles = Fn(() => {
+    const i = instanceIndex;
+    const p = positionBuffer.element(i);
+    const v = velocityBuffer.element(i);
+
+    const r1 = hash(i.add(uint(11)));
+    const r2 = hash(i.add(uint(23)));
+    const r3 = hash(i.add(uint(37)));
+    const r4 = hash(i.add(uint(53)));
+    const r5 = hash(i.add(uint(71)));
+    const r6 = hash(i.add(uint(89)));
+    const r7 = hash(i.add(uint(107)));
+
+    const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
+    const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
+
+    p.assign(spawnDirection.mul(spawnRadius));
+    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
+  })().compute(count).setName('Initialize Particles');
+
+  const updateParticles = Fn(() => {
     const p = positionBuffer.element(instanceIndex);
     const v = velocityBuffer.element(instanceIndex);
 
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // 1) CONSTANT / WIND FORCE
-    force.addAssign(params.wind.mul(params.windEnabled));
-
-    // 2) RADIAL FORCE: Se anula progresivamente al entrar en modo esfera (sphereBlend 1.0)
-    const toAttractor = params.attractor.sub(p);
+    // 1) FUERZA RADIAL (CONTROLADA POR MOUSE) - Aislada para que no afecte el modo esfera
+    const effectiveAttractor = mix(params.attractor, vec3(0.0), params.sphereBlend);
+    const toAttractor = effectiveAttractor.sub(p);
     const distance = max(toAttractor.length(), params.softening);
     const radialDirection = toAttractor.div(distance);
     
-    // Multiplicamos por (1.0 - sphereBlend) para que el mouse no afecte la esfera
     const radialForce = radialDirection
       .mul(params.radialStrength)
       .div(distance.pow(2))
       .mul(params.radialEnabled)
-      .mul(params.sphereBlend.oneMinus()); // <--- CORRECCIÓN: Si blend es 1, fuerza es 0
+      .mul(params.sphereBlend.oneMinus()); 
       
     force.addAssign(radialForce);
 
     const distFromCenter = p.length();
 
-    // 3) MODO ESFERA: Contenedor elástico firme + Inercia suave
+    // 2) MODO ESFERA ESTÁTICA + KICK (B) QUE EXPANDE DE 2 A 8
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Inercia interna sutil
+      // Inercia circular interna muy suave
       const inertiaForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.35);
       force.addAssign(inertiaForce.mul(params.sphereBlend));
 
-      // Pared contenedora que reacciona al Kick (B)
+      // Pared contenedora fija en (0,0,0)
       If(distFromCenter.greaterThan(effectiveRadius), () => {
         const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius)).mul(180.0).mul(params.sphereBlend);
         force.addAssign(pushIn);
       });
     });
 
-    // 4) MODO ARENA: Kick clásico desde el centro (independiente del mouse)
+    // 3) MODO ARENA: Onda de choque clásica independiente del mouse
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
       const waveRadius = params.beat.mul(6.0);
@@ -50,7 +90,7 @@ const updateParticles = Fn(() => {
       force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
     });
 
-    // 5) ESTÁTICA / ARENA (N)
+    // 4) ESTÁTICA / ARENA (Tecla N)
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
@@ -65,12 +105,14 @@ const updateParticles = Fn(() => {
       
     force.addAssign(staticEffect);
 
-    // 6) VORTEX FORCE
+    // 5) CONSTANT / WIND FORCE & VORTEX
+    force.addAssign(params.wind.mul(params.windEnabled));
+
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 7) LINEAR DRAG (Mantiene la esfera limpia)
+    // 6) LINEAR DRAG (Mantiene la esfera limpia)
     const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(4.5), params.sphereBlend);
     force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
@@ -84,8 +126,56 @@ const updateParticles = Fn(() => {
 
     p.addAssign(v.mul(dt));
 
-    // 8) LÍMITES PERIÓDICOS (Arena fluida)
+    // 7) LÍMITES PERIÓDICOS (Activos en modo arena)
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
+  })().compute(count).setName('Update Particles');
+
+  const material = new THREE.SpriteNodeMaterial({
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true
+  });
+
+  material.positionNode = positionBuffer.toAttribute();
+  material.scaleNode = params.particleSize;
+
+  material.colorNode = Fn(() => {
+    const speed = velocityBuffer.toAttribute().length();
+    const t = speed.div(params.maxSpeed).clamp(0.0, 1.0);
+    const slow = color('#46a6ff');
+    const fast = color('#ffb35a');
+    return vec4(mix(slow, fast, t), 1.0);
   })();
+
+  material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
+
+  const geometry = new THREE.PlaneGeometry(1, 1);
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+
+  function reset() {
+    renderer.compute(initParticles);
+  }
+
+  function stepSimulation() {
+    renderer.compute(updateParticles);
+  }
+
+  function dispose() {
+    geometry.dispose();
+    material.dispose();
+    scene.remove(mesh);
+  }
+
+  return {
+    count,
+    positionBuffer,
+    velocityBuffer,
+    reset,
+    stepSimulation,
+    dispose
+  };
+}
