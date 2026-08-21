@@ -64,27 +64,30 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-// 2) MODO ESFERA: Pared contenedora exagerada y "elástica"
+// 2) MODO ESFERA: Estilo "Orbe Vivo" (Influencia H.A.Y)
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Inercia circular interna
-      const inertiaForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.35);
-      force.addAssign(inertiaForce.mul(params.sphereBlend));
+      // A. ROTACIÓN ORBITAL (El giro suave de la esfera)
+      // Usamos el producto cruz para orbitar alrededor del eje Z
+      const orbitalForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.8); 
+      force.addAssign(orbitalForce.mul(params.sphereBlend));
 
-      // CORRECCIÓN: Pared mucho más agresiva
-      // Aumentamos el multiplicador de 180.0 a 1200.0 para un rebote tipo "cápsula rígida"
-      // También añadimos un pequeño boost extra basado en la velocidad actual para que se sientan "pesadas"
+      // B. REBOTE ELÁSTICO AGRESIVO (El "Pop" del beat)
+      // Si se alejan, las empujamos con muchísima fuerza hacia el centro
       If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const penetration = distFromCenter.sub(effectiveRadius);
-        const pushIn = p.normalize().negate()
-          .mul(penetration.mul(1200.0)) // Aumentado significativamente
-          .mul(params.sphereBlend);
-        
+        const diff = distFromCenter.sub(effectiveRadius);
+        // Multiplicador alto (1500.0) para que sea un rebote seco y sólido
+        const pushIn = p.normalize().negate().mul(diff.mul(1500.0)).mul(params.sphereBlend);
         force.addAssign(pushIn);
         
-        // Efecto secundario: frenado brusco al chocar para que el rebote sea más "seco"
-        v.mulAssign(0.5); 
+        // Fricción al chocar: disipa energía para que no se vuelvan locas
+        v.mulAssign(0.2); 
       });
+      
+      // C. ATRACCIÓN SUAVE AL CENTRO (Mantiene la forma esférica)
+      // Mantiene la densidad de la esfera alta, como en el video
+      const centerPull = p.negate().mul(0.5).mul(params.sphereBlend);
+      force.addAssign(centerPull);
     });
 
     // 3) MODO ARENA: Onda de choque clásica independiente del mouse
