@@ -36,7 +36,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(0.0));
+    v.assign(vec3(r1, r2, r3).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -48,19 +48,29 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Estática con retorno elástico al tamaño original)
+    // 1) MODO ESFERA (Flujo dinámico orgánico + Retorno elástico al radio)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
+      // 1. Flujo interno continuo para que las partículas nunca se queden estáticas
+      const sphereFlow = vec3(
+        sin(p.y.mul(1.5)),
+        sin(p.z.mul(1.5)),
+        sin(p.x.mul(1.5))
+      ).mul(1.2);
+      force.addAssign(sphereFlow.mul(params.sphereBlend));
+
+      // 2. Radio objetivo dinámico controlado por el beat (B)
       const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
       
       const toCenterDir = p.normalize();
-      const currentRadius = distFromCenter;
+      const radiusDiff = distFromCenter.sub(targetRadius);
       
-      const radiusDiff = currentRadius.sub(targetRadius);
-      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(120.0));
+      // 3. Fuerza elástica que expande con el beat y regresa al tamaño base
+      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(100.0));
       force.addAssign(elasticForce.mul(params.sphereBlend));
 
-      force.addAssign(v.mul(-15.0).mul(params.sphereBlend));
+      // 4. Amortiguación equilibrada para mantener fluidez sin descontrolar la velocidad
+      force.addAssign(v.mul(-2.0).mul(params.sphereBlend));
     });
 
     // ==========================================
@@ -132,7 +142,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // Aplicación de los límites del cubo (boundsSize) compartidos con tu otro modo
+    // Aplicación de los límites del cubo compartidos
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
