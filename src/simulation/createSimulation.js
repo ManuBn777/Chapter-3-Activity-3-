@@ -14,18 +14,13 @@ import {
   uv,
   vec3,
   vec4,
-  sin,
-  cos
+  sin
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
-  // STATE -----------------------------------------------------------------
-  // Each particle owns position and velocity. The arrays live in GPU storage.
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-  // INITIALIZATION --------------------------------------------------------
-  // A compute pass writes the initial state for every particle in parallel.
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -39,7 +34,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Spawn particles throughout a sphere instead of a cube.
     const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
     const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
 
@@ -47,9 +41,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
-  // UPDATE / COMPUTE SHADER ----------------------------------------------
-  // This is the conceptual heart of the project:
-  // state -> forces -> acceleration -> velocity -> position.
   const updateParticles = Fn(() => {
     const p = positionBuffer.element(instanceIndex);
     const v = velocityBuffer.element(instanceIndex);
@@ -60,7 +51,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 1) CONSTANT / WIND FORCE
     force.addAssign(params.wind.mul(params.windEnabled));
 
-    // 2) RADIAL FORCE (positive = attraction, negative = repulsion)
+    // 2) RADIAL FORCE
     const toAttractor = params.attractor.sub(p);
     const distance = max(toAttractor.length(), params.softening);
     const radialDirection = toAttractor.div(distance);
@@ -70,27 +61,36 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) WATER DROPLET RIPPLE / TEMBLOR RÁPIDO:
-    // Una oscilación senoidal de altísima frecuencia basada en la distancia al centro 
-    // y multiplicada por el beat, simulando el impacto de la gota en agua quieta.
-    const rippleFreq = distance.mul(25.0); // Frecuencia de las ondas en el espacio
-    const rippleShake = radialDirection
-      .mul(sin(rippleFreq))
+    // 3) KICK / SHOCKWAVE (Tecla B): 
+    // Frente de onda expansivo instantáneo y contundente que decae rápidamente.
+    // Simula el golpe seco de un bombo propagándose en anillo hacia afuera.
+    const waveRadius = params.beat.mul(6.0); // Velocidad de expansión de la onda
+    const waveBand = distance.sub(waveRadius).abs(); // Anillo activo de la onda
+    const shockwave = radialDirection
       .mul(params.beatStrength)
-      .mul(params.beat);
-      
-    force.addAssign(rippleShake);
+      .mul(-1.0)
+      .mul(params.beat)
+      .div(waveBand.add(0.2)); // Concentrado en el frente del impacto
+    force.addAssign(shockwave);
 
-    // 4) VORTEX FORCE: tangent to the radial direction around Z.
+    // 4) ESTÁTICA / RIPPLE (Tecla N):
+    // El temblor rápido de alta frecuencia estilo gota de agua.
+    const rippleFreq = distance.mul(25.0);
+    const staticRipple = radialDirection
+      .mul(sin(rippleFreq))
+      .mul(params.staticStrength)
+      .mul(params.staticTrigger);
+    force.addAssign(staticRipple);
+
+    // 5) VORTEX FORCE
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 5) LINEAR DRAG: F = -c v
+    // 6) LINEAR DRAG
     force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
 
-    // INTEGRATION ---------------------------------------------------------
-    // Unit mass: a = F. Semi-implicit Euler: update v, then p.
+    // INTEGRATION
     v.addAssign(force.mul(dt));
 
     const speed = v.length();
@@ -100,13 +100,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // Periodic boundary conditions: particles leaving one side re-enter.
     const half = params.boundsSize.mul(0.5);
     p.assign(mod(p.add(half), params.boundsSize).sub(half));
   })().compute(count).setName('Update Particles');
 
-  // RENDER ---------------------------------------------------------------
-  // Rendering does not recompute the physics. It consumes the GPU state.
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -124,7 +121,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     return vec4(mix(slow, fast, t), 1.0);
   })();
 
-  // Circular sprite mask, avoiding visible square planes.
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
 
   const geometry = new THREE.PlaneGeometry(1, 1);
