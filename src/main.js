@@ -207,7 +207,7 @@ async function main() {
   // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-    params.beat.value = Math.max(0, params.beat.value - delta * 0.65);
+    params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
 
     if (!paused) simulation.stepSimulation();
     orbit.update();
