@@ -51,7 +51,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 1) CONSTANT / WIND FORCE
     force.addAssign(params.wind.mul(params.windEnabled));
 
-    // 2) RADIAL FORCE
+    // 2) RADIAL FORCE (Mouse attractor en modo LAB)
     const toAttractor = params.attractor.sub(p);
     const distance = max(toAttractor.length(), params.softening);
     const radialDirection = toAttractor.div(distance);
@@ -61,18 +61,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) ESFERA CONTENEDORA + BOUNCE DEL KICK (El radio pasa de baseRadius a baseRadius + beatExpansion)
     const distFromCenter = p.length();
+
+    // 3) MODO ESFERA: Inercia sutil + Contenedor elástico que se expande de 2 a 8 con B
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
-    
     If(params.sphereBlend.greaterThan(0.01), () => {
+      // Inercia interna muy suave en la esfera
+      const inertiaForce = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.35);
+      force.addAssign(inertiaForce.mul(params.sphereBlend));
+
+      // Pared contenedora elástica con el radio dinámico del Kick
       If(distFromCenter.greaterThan(effectiveRadius), () => {
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius)).mul(120.0).mul(params.sphereBlend);
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius)).mul(180.0).mul(params.sphereBlend);
         force.addAssign(pushIn);
       });
     });
 
-    // 4) ESTÁTICA / ARENA (Tecla N): Dispersión
+    // 4) MODO ARENA: Kick clásico basado en onda expansiva desde el centro (0,0,0)
+    If(params.sphereBlend.lessThan(0.99), () => {
+      const centerDir = p.normalize();
+      const waveRadius = params.beat.mul(6.0);
+      const waveBand = distFromCenter.sub(waveRadius).abs();
+      const arenaShockwave = centerDir
+        .mul(params.beatStrength)
+        .mul(params.beat)
+        .div(waveBand.add(0.2));
+      force.addAssign(arenaShockwave.mul(vec3(1.0).sub(params.sphereBlend)));
+    });
+
+    // 5) ESTÁTICA / ARENA (Tecla N)
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
@@ -87,13 +104,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       
     force.addAssign(staticEffect);
 
-    // 5) VORTEX FORCE
+    // 6) VORTEX FORCE
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 6) LINEAR DRAG (Mayor amortiguación en la esfera para mantener la inercia limpia)
-    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(3.5), params.sphereBlend);
+    // 7) LINEAR DRAG (Mantiene la esfera limpia y ordenada)
+    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(4.5), params.sphereBlend);
     force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
 
     // INTEGRATION
@@ -106,7 +123,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // 7) LÍMITES PERIÓDICOS (Arena libre)
+    // 8) LÍMITES PERIÓDICOS (Activos en modo arena fluida)
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
