@@ -98,7 +98,7 @@ async function main() {
     else if (id === 'attract') { params.radialEnabled.value = 1; params.radialStrength.value = 3.0; }
     else if (id === 'repel') { params.radialEnabled.value = 1; params.radialStrength.value = -3.0; }
     else if (id === 'vortex') { params.radialEnabled.value = 1; params.radialStrength.value = 1.0; params.vortexEnabled.value = 1; params.vortexStrength.value = 3.0; params.dragEnabled.value = 1; params.dragCoefficient.value = 0.08; }
-    
+
     simulation.reset();
   };
 
@@ -155,7 +155,7 @@ async function main() {
 
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-    
+
     params.sphereBlend.value += (targetSphereBlend - params.sphereBlend.value) * Math.min(1.0, delta * 4.0);
     params.beat.value = Math.max(0, params.beat.value - delta * 8.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
