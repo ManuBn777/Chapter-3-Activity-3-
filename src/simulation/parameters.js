@@ -20,9 +20,10 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // B triggers this short manual outward pulse.
+// B triggers this short manual outward pulse.
     beat: uniform(0.0),
-    beatStrength: uniform(4.0),
+    beatStrength: uniform(6.0),
+    beatSpring: uniform(3.5),   // <--- AQUÍ LO AÑADES
 
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
