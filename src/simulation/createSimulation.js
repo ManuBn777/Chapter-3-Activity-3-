@@ -34,12 +34,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica inicial en 3D
+    // Distribución esférica volumétrica real en 3D para el inicio
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    // Velocidad inicial suave para que comiencen a moverse de inmediato
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
@@ -49,40 +48,54 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
-
     const distFromCenter = p.length();
 
-    // MODO ESFERA CON MOVIMIENTO INTERNO FLUIDO
+    // ==========================================
+    // 1) MODO ESFERA (Inercia sutil, volumen 3D y beat)
+    // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      
-      // 1. FLUJO INTERNO TRIDIMENSIONAL (Movimiento orgánico tipo fluido dentro de la esfera)
-      const internalFlow = vec3(
-        sin(p.y.mul(2.0)),
-        sin(p.z.mul(2.0)),
-        sin(p.x.mul(2.0))
-      ).mul(1.5);
-      force.addAssign(internalFlow.mul(params.sphereBlend));
+      // Inercia y flujo interno suave dentro de la esfera
+      const sphereFlow = vec3(
+        sin(p.y.mul(1.5)),
+        sin(p.z.mul(1.5)),
+        sin(p.x.mul(1.5))
+      ).mul(0.8);
+      force.addAssign(sphereFlow.mul(params.sphereBlend));
 
-      // 2. IMPULSO DEL BEAT (Expansión dinámica cuando se activa)
+      // Impulso del beat en modo esfera
       If(params.beat.greaterThan(0.01), () => {
         const beatImpulse = p.normalize().mul(params.beat.mul(params.beatExpansion));
         force.addAssign(beatImpulse.mul(params.sphereBlend));
       });
 
-      // 3. CONTENCIÓN SUAVE (Fuerza elástica de rebote que evita que salgan de la esfera)
+      // Contención elástica para mantener la forma esférica sin aplanarse
       If(distFromCenter.greaterThan(params.baseRadius), () => {
         const diff = distFromCenter.sub(params.baseRadius);
-        // Empuja hacia el centro y frena la velocidad hacia afuera para crear un rebote suave
-        force.addAssign(p.normalize().negate().mul(diff.mul(80.0)).mul(params.sphereBlend));
-        v.assign(v.mul(0.85)); // Amortiguación en el borde
+        force.addAssign(p.normalize().negate().mul(diff.mul(60.0)).mul(params.sphereBlend));
       });
 
-      // 4. FRICCIÓN LEVE (Permite que floten con inercia sin acelerarse infinitamente)
-      force.addAssign(v.mul(-0.8).mul(params.sphereBlend));
+      // Amortiguación propia del modo esfera para mantener la inercia fluida
+      force.addAssign(v.mul(-1.2).mul(params.sphereBlend));
     });
 
-    // MODO ARENA (Comportamiento alternativo cuando sphereBlend es 0)
+    // ==========================================
+    // 2) MODO ARENA (Comportamiento original completo)
+    // ==========================================
     If(params.sphereBlend.lessThan(0.99), () => {
+      // Fuerza radial del mouse / attractor
+      const effectiveAttractor = params.attractor;
+      const toAttractor = effectiveAttractor.sub(p);
+      const distance = max(toAttractor.length(), params.softening);
+      const radialDirection = toAttractor.div(distance);
+      
+      const radialForce = radialDirection
+        .mul(params.radialStrength)
+        .div(distance.pow(2))
+        .mul(params.radialEnabled);
+        
+      force.addAssign(radialForce.mul(params.sphereBlend.oneMinus()));
+
+      // Onda de choque clásica del beat en arena
       const centerDir = p.normalize();
       const waveRadius = params.beat.mul(6.0);
       const waveBand = distFromCenter.sub(waveRadius).abs();
@@ -92,14 +105,37 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         .div(waveBand.add(0.2));
       force.addAssign(arenaShockwave.mul(params.sphereBlend.oneMinus()));
 
-      force.addAssign(params.wind.mul(params.windEnabled));
-      force.addAssign(v.mul(params.dragCoefficient).mul(-1.0));
+      // Dispersión estática / aleatoria (Tecla N u otros triggers)
+      const randomScatter = vec3(
+        hash(instanceIndex.add(uint(13))),
+        hash(instanceIndex.add(uint(23))),
+        hash(instanceIndex.add(uint(37)))
+      ).sub(0.5);
+
+      const rippleFreq = distFromCenter.mul(25.0);
+      const staticEffect = randomScatter
+        .mul(params.staticStrength)
+        .add(radialDirection.mul(sin(rippleFreq)).mul(2.0))
+        .mul(params.staticTrigger);
+        
+      force.addAssign(staticEffect.mul(params.sphereBlend.oneMinus()));
+
+      // Viento y Vortex originales
+      force.addAssign(params.wind.mul(params.windEnabled).mul(params.sphereBlend.oneMinus()));
+
+      const zAxis = vec3(0.0, 0.0, 1.0);
+      const tangent = zAxis.cross(radialDirection);
+      force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled).mul(params.sphereBlend.oneMinus()));
+
+      // Drag lineal original de arena
+      force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0).mul(params.sphereBlend.oneMinus()));
     });
 
-    // Integración de movimiento
+    // ==========================================
+    // INTEGRACIÓN Y LÍMITES
+    // ==========================================
     v.addAssign(force.mul(dt));
 
-    // Limitar la velocidad máxima para mantener estabilidad
     const speed = v.length();
     If(speed.greaterThan(params.maxSpeed), () => {
       v.assign(v.normalize().mul(params.maxSpeed));
@@ -107,7 +143,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // Límites periódicos solo en modo arena
+    // Límites periódicos mezclados con la transición de esfera
     const half = params.boundsSize.mul(0.5);
     const wrappedPos = mod(p.add(half), params.boundsSize).sub(half);
     p.assign(mix(wrappedPos, p, params.sphereBlend));
