@@ -77,13 +77,13 @@ async function main() {
   let paused = false;
   let mode = 'LAB';
   let panel;
-  let targetSphereBlend = 1.0; // Estado objetivo para la transición fluida
+  let targetSphereBlend = 1.0;
   let savedRadialStrength = params.radialStrength.value;
   let savedRadialEnabled = params.radialEnabled.value;
   const clock = new THREE.Clock();
 
   const triggerBeat = () => {
-    params.beat.value = Math.min(2.5, params.beat.value + 1.5);
+    params.beat.value = 1.0; // Dispara el impulso máximo de expansión (de 2 a 4)
   };
 
   const triggerStatic = () => {
@@ -196,8 +196,8 @@ async function main() {
     const blendDiff = targetSphereBlend - params.sphereBlend.value;
     params.sphereBlend.value += blendDiff * Math.min(1.0, delta * 4.0);
 
-    // Decaimiento rápido del kick y la estática
-    params.beat.value = Math.max(0, params.beat.value - delta * 7.0);
+    // Decaimiento rápido del kick (hace el rebote elástico de 2 a 4 y regresa de golpe a 2)
+    params.beat.value = Math.max(0, params.beat.value - delta * 9.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
