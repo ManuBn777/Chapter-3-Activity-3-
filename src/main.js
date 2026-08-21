@@ -7,8 +7,6 @@ import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-
-
 /*
 2^15: 32768
 2^16: 65536
@@ -22,7 +20,7 @@ import { createLabPanel } from './ui/labPanel.js';
 2^24: 16777216
 */
 
-const PARTICLE_COUNT = 131072; //2^17. Increase only after measuring performance.
+const PARTICLE_COUNT = 131072; // 2^17. Increase only after measuring performance.
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -76,7 +74,6 @@ async function main() {
   scene.add(axes);
 
   // POINTER -> WORLD POSITION --------------------------------------------
-  // This is a useful camera concept: screen coordinates are not world coords.
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -102,6 +99,10 @@ async function main() {
 
   const triggerBeat = () => {
     params.beat.value = 1.0;
+  };
+
+  const triggerStatic = () => {
+    params.staticTrigger.value = 1.0;
   };
 
   const applyPreset = (id) => {
@@ -143,10 +144,8 @@ async function main() {
     axes.visible = lab;
     attractorHelper.visible = lab;
     performanceGuide.visible = !lab;
-    //orbit.enabled = lab;
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: performance · R: reset · 1–5: pruebas'
-      //: '<strong>PERFORMANCE</strong> · P: lab · espacio: invertir radial · puntero: atractor';
+      ? '<strong>LAB</strong> · P: performance · R: reset · B: kick (shockwave) · N: estática · 1–5: pruebas'
       : '';
   };
 
@@ -164,10 +163,8 @@ async function main() {
   document.body.append(hud);
   setMode('LAB');
 
-  // BASELINE LIVE INSTRUMENT MAPPING -------------------------------------
-  // Students are expected to redesign this mapping for their own instrument.
+  // KEYBOARD LISTENERS ---------------------------------------------------
   addEventListener('keydown', (event) => {
-    //console.log('radial inverted', params.radialStrength.value);
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     if (event.code === 'KeyR') simulation.reset();
@@ -177,15 +174,14 @@ async function main() {
     if (event.code === 'Digit4') applyPreset('repel');
     if (event.code === 'Digit5') applyPreset('vortex');
     if (event.code === 'KeyB') triggerBeat();
+    if (event.code === 'KeyN') triggerStatic();
 
     if (event.code === 'Space') {
       event.preventDefault();
-      //savedRadialStrength = params.radialStrength.value || 2.0;
       savedRadialStrength = params.radialStrength.value;
       savedRadialEnabled = params.radialEnabled.value;
       params.radialEnabled.value = 1;
       params.radialStrength.value = -(savedRadialStrength || 2.0);
-      //console.log('radial inverted', params.radialStrength.value);
     }
   });
 
@@ -207,7 +203,10 @@ async function main() {
   // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-    params.beat.value = Math.max(0, params.beat.value - delta * 0.65);
+    
+    // Decaimiento de los disparadores en vivo (Kick y Estática)
+    params.beat.value = Math.max(0, params.beat.value - delta * 3.0);
+    params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 2.0);
 
     if (!paused) simulation.stepSimulation();
     orbit.update();
