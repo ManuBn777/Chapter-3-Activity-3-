@@ -35,8 +35,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r4 = hash(i.add(uint(53)));
     const r5 = hash(i.add(uint(71)));
     const r6 = hash(i.add(uint(89)));
+    const r7 = hash(i.add(uint(107)));
 
-    p.assign(vec3(r1, r2, r3).sub(0.5).mul(params.boundsSize.mul(0.45)));
+    // Spawn particles throughout a sphere instead of a cube.
+    const spawnDirection = vec3(r1, r2, r3).sub(0.5).normalize();
+    const spawnRadius = r7.pow(1.0 / 3.0).mul(params.boundsSize.mul(0.45));
+
+    p.assign(spawnDirection.mul(spawnRadius));
     v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
   })().compute(count).setName('Initialize Particles');
 
