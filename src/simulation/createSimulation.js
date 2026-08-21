@@ -61,31 +61,33 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) ESTADO ESFERA COHESIVA (Fuerza elástica que mantiene la forma de esfera)
-    // Si sphereMode está activo, tira de las partículas hacia el radio ideal de la esfera
-    const idealSpherePos = radialDirection.mul(params.sphereRadius).negate().add(params.attractor);
-    const sphereRestitution = idealSpherePos.sub(p).mul(15.0).mul(params.sphereMode);
-    force.addAssign(sphereRestitution);
+    // 3) ESTADO ESFERA (Límite contenedor estático en el centro)
+    // Si la partícula excede el radio de la esfera y estamos en stateMode == 1.0, se le aplica fuerza hacia adentro
+    const distFromCenter = p.length();
+    If(params.stateMode.equal(1.0), () => {
+      If(distFromCenter.greaterThan(params.containerRadius), () => {
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(50.0);
+        force.addAssign(pushIn);
+      });
+    });
 
-    // 4) KICK / BOUNCE (Tecla B): 
-    // Impacto de bombo que comprime/expande la esfera de golpe y rebota elásticamente
-    const waveRadius = params.beat.mul(5.0);
-    const waveBand = distance.sub(waveRadius).abs();
-    const bounceShockwave = radialDirection
+    // 4) KICK / BOUNCE (Tecla B): Onda expansiva con rebote elástico
+    const waveRadius = params.beat.mul(6.0);
+    const waveBand = distFromCenter.sub(waveRadius).abs();
+    const bounceShockwave = p.normalize()
       .mul(params.beatStrength)
-      .mul(-1.0)
       .mul(params.beat)
       .div(waveBand.add(0.2));
     force.addAssign(bounceShockwave);
 
-    // 5) ESTÁTICA / ARENA (Tecla N):
+    // 5) ESTÁTICA / ARENA (Tecla N): Dispersión / temblor
     const randomScatter = vec3(
       hash(instanceIndex.add(uint(13))),
       hash(instanceIndex.add(uint(23))),
       hash(instanceIndex.add(uint(37)))
     ).sub(0.5);
 
-    const rippleFreq = distance.mul(25.0);
+    const rippleFreq = distFromCenter.mul(25.0);
     const staticEffect = randomScatter
       .mul(params.staticStrength)
       .add(radialDirection.mul(sin(rippleFreq)).mul(2.0))
@@ -98,9 +100,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 7) LINEAR DRAG (Aumentamos un poco el drag cuando hay esfera para que no oscile infinito)
-    const effectiveDrag = mix(params.dragCoefficient, params.dragCoefficient.mul(2.5), params.sphereMode);
-    force.addAssign(v.mul(effectiveDrag).mul(params.dragEnabled).mul(-1.0));
+    // 7) LINEAR DRAG
+    force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
 
     // INTEGRATION
     v.addAssign(force.mul(dt));
@@ -112,8 +113,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    const half = params.boundsSize.mul(0.5);
-    p.assign(mod(p.add(half), params.boundsSize).sub(half));
+    // Periodic boundary conditions (solo aplican si no estamos confinados estrictamente en la esfera)
+    If(params.stateMode.equal(0.0), () => {
+      const half = params.boundsSize.mul(0.5);
+      p.assign(mod(p.add(half), params.boundsSize).sub(half));
+    });
   })().compute(count).setName('Update Particles');
 
   const material = new THREE.SpriteNodeMaterial({
