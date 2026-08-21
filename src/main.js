@@ -97,12 +97,13 @@ async function main() {
   let savedRadialEnabled = params.radialEnabled.value;
   const clock = new THREE.Clock();
 
+  // Acumulación de energía para tempos altos (130+ BPM)
   const triggerBeat = () => {
-    params.beat.value = 1.0;
+    params.beat.value = Math.min(2.0, params.beat.value + 1.2);
   };
 
   const triggerStatic = () => {
-    params.staticTrigger.value = 1.0;
+    params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
   };
 
   const applyPreset = (id) => {
@@ -204,9 +205,9 @@ async function main() {
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
     
-    // Decaimiento de los disparadores en vivo (Kick y Estática)
-    params.beat.value = Math.max(0, params.beat.value - delta * 3.0);
-    params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 2.0);
+    // Decaimiento rápido y agresivo para soportar ritmos altos (130+ BPM) sin perder el transitorio
+    params.beat.value = Math.max(0, params.beat.value - delta * 6.0);
+    params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 3.5);
 
     if (!paused) simulation.stepSimulation();
     orbit.update();
