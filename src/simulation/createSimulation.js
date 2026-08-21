@@ -61,12 +61,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) ESTADO ESFERA (Límite contenedor estático en el centro)
-    // Si la partícula excede el radio de la esfera y estamos en stateMode == 1.0, se le aplica fuerza hacia adentro
+    // 3) ESTADO ESFERA (Límite contenedor estático) vs ESTADO ARENA (Libre)
     const distFromCenter = p.length();
+    
+    // Si estamos en Modo Esfera (1.0), contenemos estrictamente a las partículas dentro de la esfera
     If(params.stateMode.equal(1.0), () => {
       If(distFromCenter.greaterThan(params.containerRadius), () => {
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(50.0);
+        const pushIn = p.normalize().negate().mul(distFromCenter.sub(params.containerRadius)).mul(60.0);
         force.addAssign(pushIn);
       });
     });
@@ -113,7 +114,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // Periodic boundary conditions (solo aplican si no estamos confinados estrictamente en la esfera)
+    // 8) LÍMITES DE ESPACIO: Si estamos en Modo Arena (0.0), recuperamos el comportamiento libre con wrap periódico
     If(params.stateMode.equal(0.0), () => {
       const half = params.boundsSize.mul(0.5);
       p.assign(mod(p.add(half), params.boundsSize).sub(half));
