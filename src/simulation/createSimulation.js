@@ -29,17 +29,14 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
-    const r4 = hash(i.add(uint(53)));
-    const r5 = hash(i.add(uint(71)));
-    const r6 = hash(i.add(uint(89)));
     const r7 = hash(i.add(uint(107)));
 
-    // Distribución esférica volumétrica 3D inicial
+    // Distribución esférica volumétrica 3D inicial sólida
     const dir = vec3(r1, r2, r3).sub(0.5).normalize();
     const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
     p.assign(dir.mul(radius));
-    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
+    v.assign(vec3(0.0)); // Nacen completamente quietas
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
@@ -51,19 +48,22 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Flujo dinámico continuo sin contracción)
+    // 1) MODO ESFERA (Estática con retorno elástico al tamaño original)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // Flujo interno orgánico constante para que nunca se queden quietas
-      const sphereFlow = vec3(
-        sin(p.y.mul(1.5)),
-        sin(p.z.mul(1.5)),
-        sin(p.x.mul(1.5))
-      ).mul(1.5);
-      force.addAssign(sphereFlow.mul(params.sphereBlend));
+      // Radio objetivo dinámico que se expande con el beat (B) y regresa a baseRadius
+      const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
+      
+      const toCenterDir = p.normalize();
+      const currentRadius = distFromCenter;
+      
+      // Fuerza elástica pura hacia el radio objetivo (mantiene la esfera firme y la regresa a su tamaño)
+      const radiusDiff = currentRadius.sub(targetRadius);
+      const elasticForce = toCenterDir.negate().mul(radiusDiff.mul(120.0));
+      force.addAssign(elasticForce.mul(params.sphereBlend));
 
-      // Amortiguación suave para estabilizar velocidad sin tirones hacia adentro
-      force.addAssign(v.mul(-0.2).mul(params.sphereBlend));
+      // Fricción alta para anular inercias flotantes y mantenerla estable cuando no hay beat
+      force.addAssign(v.mul(-15.0).mul(params.sphereBlend));
     });
 
     // ==========================================
@@ -92,19 +92,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / SHOCKWAVE (Diferenciado por modo)
+    // 3) BOTÓN B: KICK / SHOCKWAVE (Solo para modo arena si se requiere onda libre)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
-      const centerDir = p.normalize();
-
-      // Kick para MODO ESFERA: Shockwave de expansión pura hacia afuera, sin compresión ni freno interior
-      If(params.sphereBlend.greaterThan(0.5), () => {
-        // Impulso de velocidad directo hacia afuera que respeta el flujo general
-        v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(45.0)).mul(params.sphereBlend));
-      });
-
-      // Kick para MODO ARENA: Onda de choque elástica original
       If(params.sphereBlend.lessThan(0.5), () => {
+        const centerDir = p.normalize();
         const waveRadius = params.beat.mul(25.0);
         const waveBand = distFromCenter.sub(waveRadius).abs();
         const arenaShockwave = centerDir
