@@ -52,7 +52,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Intacto y perfecto)
+    // 1) MODO ESFERA (Olas fluidas + Expansión + Giro Q/W)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
       // Patrón de ondas fluidas constante
@@ -61,12 +61,12 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         sin(p.z.mul(2.0).add(params.beat.mul(5.0))),
         sin(p.x.mul(2.0).add(params.beat.mul(5.0)))
       ).mul(4.0);
-      //force.addAssign(waveFlow.mul(params.sphereBlend));
+      force.addAssign(waveFlow.mul(params.sphereBlend));
 
-      // Control de giro con Q y W (dirección) + A y S (velocidad)
+      // Control de giro con Q (izquierda) y W (derecha)
       const rotationAxis = vec3(0.0, 1.0, 0.0);
       const tangentDir = rotationAxis.cross(p);
-      const spinForce = tangentDir.mul(params.spinDirection).mul(params.spinSpeed);
+      const spinForce = tangentDir.mul(params.spinDirection).mul(3.0);
       force.addAssign(spinForce.mul(params.sphereBlend));
 
       // Radio objetivo y contención elástica suave
@@ -80,7 +80,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 2) MODO ARENA (¡CON POTENCIA MULTIPLICADA!)
+    // 2) MODO ARENA (Potencia multiplicada)
     // ==========================================
     If(params.sphereBlend.lessThan(0.99), () => {
       const effectiveAttractor = params.attractor;
@@ -88,7 +88,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const distance = max(toAttractor.length(), params.softening);
       const radialDirection = toAttractor.div(distance);
       
-      // Multiplicamos por 3.0 para darles mucha más fuerza y presencia
       const radialForce = radialDirection
         .mul(params.radialStrength)
         .div(distance.pow(2))
@@ -97,10 +96,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         
       force.addAssign(radialForce.mul(params.sphereBlend.oneMinus()));
 
-      // Viento con mayor impacto
       force.addAssign(params.wind.mul(params.windEnabled).mul(3.0).mul(params.sphereBlend.oneMinus()));
 
-      // Vórtice más potente
       const zAxis = vec3(0.0, 0.0, 1.0);
       const tangent = zAxis.cross(radialDirection);
       force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled).mul(3.0).mul(params.sphereBlend.oneMinus()));
@@ -109,14 +106,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / SHOCKWAVE (Modo arena con más potencia)
+    // 3) BOTÓN B: KICK / SHOCKWAVE (Modo arena)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       If(params.sphereBlend.lessThan(0.5), () => {
         const centerDir = p.normalize();
         const waveRadius = params.beat.mul(25.0);
         const waveBand = distFromCenter.sub(waveRadius).abs();
-        // Onda expansiva de impacto con mayor fuerza
         const arenaShockwave = centerDir
           .mul(params.beatStrength)
           .mul(params.beat)
