@@ -18,13 +18,14 @@ export function createParameters() {
     radialStrength: uniform(2.2),
     softening: uniform(0.35),
 
-    // Transición fluida de estado (0.0 = Arena, 1.0 = Esfera)
+    // Transición de estado (0.0 = Arena fluida, 1.0 = Esfera)
     sphereBlend: uniform(1.0),
-    baseRadius: uniform(2.0), // Tamaño base de la esfera (2)
+    baseRadius: uniform(2.0),
 
-    // B: Kick / Bounce que expande el radio de 2 a 4 elásticamente
+    // B: Kick / Bounce masivo en la esfera (de 2 a 8) y onda en arena
     beat: uniform(0.0),
-    beatExpansion: uniform(2.0), // Cuánto se expande (2 + 2 = 4)
+    beatExpansion: uniform(6.0), // 2.0 base + 6.0 = 8.0 de radio máximo en el golpe
+    beatStrength: uniform(25.0),
 
     // N: Estática
     staticTrigger: uniform(0.0),
