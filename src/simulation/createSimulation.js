@@ -64,36 +64,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const distFromCenter = p.length();
 
-// 2) MODO ESFERA: Comportamiento mecánico estilo NCS
+// 2) MODO ESFERA: Bounce masivo, elástico y de largo recorrido
     const effectiveRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
     
     If(params.sphereBlend.greaterThan(0.01), () => {
-      // A. ROTACIÓN: Movimiento base (fluidez)
-      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.5);
+      // A. ROTATION: Inercia circular fluida
+      const rotation = p.normalize().cross(vec3(0.0, 0.0, 1.0)).mul(0.6);
       force.addAssign(rotation.mul(params.sphereBlend));
 
-      // B. EL "KICK" MECÁNICO (La clave del bounce del video)
-      // Si el beat es alto, empujamos las partículas hacia afuera activamente, 
-      // creando la expansión que ves en el video.
-      const beatPush = p.normalize().mul(params.beat.mul(400.0));
-      force.addAssign(beatPush.mul(params.sphereBlend));
+      // B. KICK / EXPANSION: Impulso masivo hacia afuera al pulsar B
+      const beatImpulse = p.normalize().mul(params.beat.mul(650.0));
+      force.addAssign(beatImpulse.mul(params.sphereBlend));
 
-      // C. PARED DE REBOTE (El límite sólido)
-      If(distFromCenter.greaterThan(effectiveRadius), () => {
-        // Al tocar el límite, invertimos la velocidad con un factor de restitución
-        // Esto crea el efecto de "choque" contra una pared invisible
-        const pushIn = p.normalize().negate().mul(distFromCenter.sub(effectiveRadius).mul(2000.0));
-        force.addAssign(pushIn.mul(params.sphereBlend));
-        
-        // FRENADO BRUSCO: Esto es lo que hace que parezca una pared sólida
-        v.assign(v.mul(-0.3)); 
-      });
+      // C. RESORTE ELÁSTICO LARGO (Adiós al freno seco)
+      // En lugar de una pared rígida, usamos una fuerza tipo Hooke muy elástica.
+      // Cuanto más se alejan del radio efectivo, más fuerte es el tirón de regreso, 
+      // pero con suficiente inercia para que "se pasen de largo" y respiren.
+      const distanceDiff = distFromCenter.sub(effectiveRadius);
       
-      // D. COMPRESIÓN: Si el beat es 0, las partículas vuelven al centro suavemente
-      const contraction = p.negate().mul(params.beat.oneMinus().mul(2.0));
-      force.addAssign(contraction.mul(params.sphereBlend));
-    });
+      // Si la distancia es mayor al radio, un resorte suave pero potente las atrae de vuelta
+      If(distFromCenter.greaterThan(effectiveRadius), () => {
+        const elasticPull = p.normalize().negate().mul(distanceDiff.pow(1.2).mul(350.0));
+        force.addAssign(elasticPull.mul(params.sphereBlend));
+      });
 
+      // D. COMPRESIÓN ORGÁNICA: Mantiene la esfera unida pero con juego elástico
+      const organicPull = p.negate().mul(distFromCenter.mul(1.5));
+      force.addAssign(organicPull.mul(params.sphereBlend.oneMinus().or(params.beat.oneMinus())));
+    });
+    
     // 3) MODO ARENA: Onda de choque clásica independiente del mouse
     If(params.sphereBlend.lessThan(0.99), () => {
       const centerDir = p.normalize();
