@@ -51,7 +51,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const distFromCenter = p.length();
 
     // ==========================================
-    // 1) MODO ESFERA (Inercia sutil, volumen 3D y rebote)
+    // 1) MODO ESFERA (Inercia sutil y volumen 3D sin compresión)
     // ==========================================
     If(params.sphereBlend.greaterThan(0.01), () => {
       const sphereFlow = vec3(
@@ -61,16 +61,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       ).mul(1.2);
       force.addAssign(sphereFlow.mul(params.sphereBlend));
 
-      If(distFromCenter.greaterThan(params.baseRadius), () => {
-        const diff = distFromCenter.sub(params.baseRadius);
-        force.addAssign(p.normalize().negate().mul(diff.mul(80.0)).mul(params.sphereBlend));
+      // Solo frenamos suavemente si exceden el radio máximo, sin succionarlas de vuelta
+      If(distFromCenter.greaterThan(params.baseRadius.mul(1.3)), () => {
+        const diff = distFromCenter.sub(params.baseRadius.mul(1.3));
+        force.addAssign(p.normalize().negate().mul(diff.mul(20.0)).mul(params.sphereBlend));
       });
 
-      force.addAssign(v.mul(-0.5).mul(params.sphereBlend));
+      force.addAssign(v.mul(-0.3).mul(params.sphereBlend));
     });
 
     // ==========================================
-    // 2) MODO ARENA (Comportamiento dinámico)
+    // 2) MODO ARENA (Comportamiento fluido original)
     // ==========================================
     If(params.sphereBlend.lessThan(0.99), () => {
       const effectiveAttractor = params.attractor;
@@ -95,27 +96,27 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // ==========================================
-    // 3) BOTÓN B: KICK / THUMP (Bombo ultra potente de gran expansión)
+    // 3) BOTÓN B: KICK / THUMP (Expansión masiva sin contracción brusca)
     // ==========================================
     If(params.beat.greaterThan(0.01), () => {
       const centerDir = p.normalize();
-      // Rango de onda mucho más amplio y fuerza multiplicada drásticamente
-      const waveRadius = params.beat.mul(25.0);
+      
+      const waveRadius = params.beat.mul(30.0);
       const waveBand = distFromCenter.sub(waveRadius).abs();
+      
+      // Solo aplicamos fuerza hacia afuera (evitando valores negativos que compriman)
       const kickShockwave = centerDir
         .mul(params.beatStrength)
         .mul(params.beat)
-        .mul(12.0)
-        .div(waveBand.add(0.08));
+        .mul(25.0)
+        .div(waveBand.add(0.1));
       
       force.addAssign(kickShockwave);
-      
-      // Impulso directo a la velocidad para que la expansión se note al instante
-      v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(40.5)));
+      v.addAssign(centerDir.mul(params.beat.mul(params.beatStrength).mul(70.0)));
     });
 
     // ==========================================
-    // 4) BOTÓN N: ESTÁTICA / DISPERSIÓN FUERTE
+    // 4) BOTÓN N: ESTÁTICA / DISPERSIÓN
     // ==========================================
     If(params.staticTrigger.greaterThan(0.01), () => {
       const randomScatter = vec3(
