@@ -26,7 +26,7 @@ export function createParameters() {
     staticTrigger: uniform(0.0),
     staticStrength: uniform(6.0),
     // Controles de Órbita y Giro (Q/W y A/S)
-    spinDirection: uniform(1.0), // 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
+    spinDirection: uniform(0.0), // 0.0 en reposo. 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
     spinSpeed: uniform(1.5),     // Velocidad orbital ajustable (A/S)
     vortexEnabled: uniform(1.0),
     vortexStrength: uniform(1.4),
