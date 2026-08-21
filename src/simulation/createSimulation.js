@@ -68,12 +68,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.radialEnabled);
     force.addAssign(radialForce);
 
-    // 3) VORTEX FORCE: tangent to the radial direction around Z.
+    // 3) BEAT PULSE: a short outward impulse from the attractor.
+    // beat is set by the performer and decays on the CPU each frame.
+    force.addAssign(radialDirection.mul(-params.beatStrength).mul(params.beat));
+
+    // 4) VORTEX FORCE: tangent to the radial direction around Z.
     const zAxis = vec3(0.0, 0.0, 1.0);
     const tangent = zAxis.cross(radialDirection);
     force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
 
-    // 4) LINEAR DRAG: F = -c v
+    // 5) LINEAR DRAG: F = -c v
     force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
 
     // INTEGRATION ---------------------------------------------------------

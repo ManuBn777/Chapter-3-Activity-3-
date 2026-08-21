@@ -72,6 +72,19 @@ async function main() {
   performanceGuide.visible = false;
   scene.add(performanceGuide);
 
+  const beatGuide = new THREE.Mesh(
+    new THREE.RingGeometry(0.10, 0.13, 64),
+    new THREE.MeshBasicMaterial({
+      color: '#9fd8ff',
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  beatGuide.visible = false;
+  scene.add(beatGuide);
+
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
@@ -98,6 +111,11 @@ async function main() {
   let panel;
   let savedRadialStrength = params.radialStrength.value;
   let savedRadialEnabled = params.radialEnabled.value;
+  const clock = new THREE.Clock();
+
+  const triggerBeat = () => {
+    params.beat.value = 1.0;
+  };
 
   const applyPreset = (id) => {
     params.windEnabled.value = 0;
@@ -149,6 +167,7 @@ async function main() {
     params,
     onReset: () => simulation.reset(),
     onPreset: applyPreset,
+    onBeat: triggerBeat,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => paused = !paused
   });
@@ -170,6 +189,7 @@ async function main() {
     if (event.code === 'Digit3') applyPreset('attract');
     if (event.code === 'Digit4') applyPreset('repel');
     if (event.code === 'Digit5') applyPreset('vortex');
+    if (event.code === 'KeyB') triggerBeat();
 
     if (event.code === 'Space') {
       event.preventDefault();
@@ -199,6 +219,15 @@ async function main() {
 
   // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
+    const delta = Math.min(clock.getDelta(), 0.05);
+    params.beat.value = Math.max(0, params.beat.value - delta * 3.5);
+
+    const beatProgress = 1 - params.beat.value;
+    beatGuide.position.copy(params.attractor.value);
+    beatGuide.scale.setScalar(1 + beatProgress * 15);
+    beatGuide.material.opacity = params.beat.value * 0.55;
+    beatGuide.visible = params.beat.value > 0.01;
+
     if (!paused) simulation.stepSimulation();
     orbit.update();
     renderer.render(scene, camera);
