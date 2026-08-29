@@ -1,4 +1,5 @@
-import { uniform, Vector3 } from 'three/tsl';
+import { Vector3 } from 'three';
+import { uniform } from 'three/tsl';
 
 export function createParameters() {
   return {
@@ -6,13 +7,8 @@ export function createParameters() {
     // TIEMPO
     // =========================================================
 
-    // Paso fijo de simulación.
     dt: uniform(1.0 / 60.0),
-
-    // Multiplicador general del tiempo.
     timeScale: uniform(1.0),
-
-    // Velocidad máxima de una partícula.
     maxSpeed: uniform(4.0),
 
     // =========================================================
@@ -35,10 +31,7 @@ export function createParameters() {
     // 1 = Esfera
     sphereBlend: uniform(0.0),
 
-    // Radio base utilizado por la esfera.
     baseRadius: uniform(3.0),
-
-    // Expansión de la esfera durante el kick.
     beatExpansion: uniform(0.8),
 
     // =========================================================
@@ -47,9 +40,6 @@ export function createParameters() {
 
     radialEnabled: uniform(0.0),
     radialStrength: uniform(0.0),
-
-    // Evita singularidades cuando una partícula está
-    // demasiado cerca del atractor.
     softening: uniform(0.15),
 
     // =========================================================
@@ -71,17 +61,13 @@ export function createParameters() {
     // =========================================================
 
     windEnabled: uniform(0.0),
-
-    // Vector real utilizado por la simulación.
     wind: uniform(new Vector3(0, 0, 0)),
 
-    // Dirección conceptual del viento.
-    // -1 = izquierda
-    // +1 = derecha
+    // Q = -1 → izquierda
+    // W = +1 → derecha
     windDirection: uniform(1.0),
 
-    // Intensidad discreta controlada por A/S.
-    // 0, 1, 2, 3, 4, 5...
+    // A/S cambian esta cantidad de 1 en 1.
     windSpeed: uniform(0.0),
 
     // =========================================================
@@ -108,15 +94,16 @@ export function createParameters() {
     // LÍMITES DE ARENA
     // =========================================================
 
-    boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
+    boundsSize: uniform(
+      new Vector3(8.0, 5.0, 6.0)
+    ),
 
     // =========================================================
-    // COMPATIBILIDAD CON LA INTERFAZ ACTUAL
+    // COMPATIBILIDAD TEMPORAL
     // =========================================================
-    //
-    // Estos dos parámetros todavía existen porque el panel actual
-    // los utiliza. Más adelante los eliminaremos/reutilizaremos
-    // cuando reconstruyamos la interfaz.
+
+    // Estos todavía existen porque labPanel.js los utiliza.
+    // Más adelante los eliminaremos/reutilizaremos.
 
     spinDirection: uniform(0.0),
     spinSpeed: uniform(0.0),
@@ -125,7 +112,7 @@ export function createParameters() {
     // MODOS
     // =========================================================
 
-    // 0 = Idle / Arena base
+    // 0 = Arena
     // 1 = Esfera
     // 2 = Círculo
     // 3 = Puntero
@@ -136,19 +123,13 @@ export function createParameters() {
     // =========================================================
 
     crazyEnabled: uniform(0.0),
-
-    // 0 = sin compresión
-    // 1 = compresión completa
     compression: uniform(0.0),
 
     // =========================================================
     // COLOR
     // =========================================================
 
-    // Índice de color dentro de la rueda cromática.
     colorIndex: uniform(0.0),
-
-    // Progreso de transición.
     colorTransition: uniform(1.0),
 
     // =========================================================
