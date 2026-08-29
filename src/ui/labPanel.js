@@ -9,16 +9,26 @@ function rangeRow(
   onInput,
   getValue
 ) {
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
+  const wrap =
+    document.createElement('div');
 
-  const lab = document.createElement('label');
+  wrap.className =
+    'row';
 
-  const name = document.createElement('span');
-  const value = document.createElement('span');
+  const lab =
+    document.createElement('label');
 
-  value.className = 'value';
-  name.textContent = label;
+  const name =
+    document.createElement('span');
+
+  const value =
+    document.createElement('span');
+
+  value.className =
+    'value';
+
+  name.textContent =
+    label;
 
   lab.append(
     name,
@@ -28,41 +38,67 @@ function rangeRow(
   const input =
     document.createElement('input');
 
-  input.type = 'range';
-  input.min = String(min);
-  input.max = String(max);
-  input.step = String(step);
-  input.value = String(object[key]);
+  input.type =
+    'range';
 
-  const refresh = () => {
-    const next =
-      Number(getValue ? getValue() : object[key]);
+  input.min =
+    String(min);
 
-    object[key] = next;
+  input.max =
+    String(max);
 
-    input.value =
-      String(next);
+  input.step =
+    String(step);
 
-    value.textContent =
-      Number(next).toFixed(
-        step < 0.01 ? 3 : 2
+  input.value =
+    String(
+      object[key]
+    );
+
+  const refresh =
+    () => {
+      const next =
+        Number(
+          getValue
+            ? getValue()
+            : object[key]
+        );
+
+      object[key] =
+        next;
+
+      input.value =
+        String(next);
+
+      value.textContent =
+        Number(next).toFixed(
+          step < 0.01
+            ? 3
+            : 2
+        );
+    };
+
+  const refreshFromInput =
+    () => {
+      const next =
+        Number(
+          input.value
+        );
+
+      object[key] =
+        next;
+
+      value.textContent =
+        Number(next).toFixed(
+          step < 0.01
+            ? 3
+            : 2
+        );
+
+      onInput?.(
+        next
       );
-  };
-
-  const refreshFromInput = () => {
-    const next =
-      Number(input.value);
-
-    object[key] =
-      next;
-
-    value.textContent =
-      Number(next).toFixed(
-        step < 0.01 ? 3 : 2
-      );
-
-    onInput?.(next);
-  };
+    };
 
   input.addEventListener(
     'input',
@@ -82,7 +118,6 @@ function rangeRow(
 
   return {
     input,
-
     refresh
   };
 }
@@ -96,22 +131,30 @@ function checkRow(
   getValue
 ) {
   const wrap =
-    document.createElement('div');
+    document.createElement(
+      'div'
+    );
 
   wrap.className =
     'row';
 
   const lab =
-    document.createElement('label');
+    document.createElement(
+      'label'
+    );
 
   const name =
-    document.createElement('span');
+    document.createElement(
+      'span'
+    );
 
   name.textContent =
     label;
 
   const input =
-    document.createElement('input');
+    document.createElement(
+      'input'
+    );
 
   input.type =
     'checkbox';
@@ -145,7 +188,9 @@ function checkRow(
     input,
 
     refresh() {
-      if (getValue) {
+      if (
+        getValue
+      ) {
         input.checked =
           Boolean(
             getValue()
@@ -190,7 +235,8 @@ export function createLabPanel({
   onModeChange,
   onPauseChange
 }) {
-  const refreshers = [];
+  const refreshers =
+    [];
 
   const panel =
     document.createElement(
@@ -202,6 +248,7 @@ export function createLabPanel({
 
   panel.innerHTML = `
     <h1>U3 · Forces Instrument</h1>
+
     <p>
       LAB: aísla fuerzas, predice y prueba.
       <strong>P</strong> cambia a PERFORMANCE.
@@ -260,14 +307,6 @@ export function createLabPanel({
     staticTrigger:
       params.staticTrigger.value,
 
-    // Compatibilidad con otros controles.
-    spinDirection:
-      params.spinDirection.value,
-
-    spinSpeed:
-      params.spinSpeed.value,
-
-    // NUEVOS CONTROLES DE VIENTO
     windDirection:
       params.windDirection.value,
 
@@ -362,9 +401,9 @@ export function createLabPanel({
   );
 
 
-  // ---------------------------------------------------------
+  // =========================================================
   // ESFERA
-  // ---------------------------------------------------------
+  // =========================================================
 
   refreshers.push(
     rangeRow(
@@ -388,9 +427,9 @@ export function createLabPanel({
   );
 
 
-  // ---------------------------------------------------------
+  // =========================================================
   // ESTÁTICA
-  // ---------------------------------------------------------
+  // =========================================================
 
   refreshers.push(
     rangeRow(
@@ -415,18 +454,15 @@ export function createLabPanel({
 
 
   // =========================================================
-  // VIENTO
+  // DIRECCIÓN DEL VIENTO
   // =========================================================
   //
-  // Q = izquierda
-  // W = derecha
-  //
   // -1 = izquierda
+  //  0 = centro
   // +1 = derecha
   //
-  // El step es 2 porque solo queremos:
-  //
-  // -1 ↔ +1
+  // Q = -1
+  // W = +1
   //
   // =========================================================
 
@@ -438,7 +474,7 @@ export function createLabPanel({
       'windDirection',
       -1,
       1,
-      2,
+      0.01,
 
       (v) => {
         params.windDirection.value =
@@ -458,17 +494,11 @@ export function createLabPanel({
   // VELOCIDAD DEL VIENTO
   // =========================================================
   //
+  // 0 = sin velocidad
+  // 10 = velocidad máxima
+  //
   // A = -1
   // S = +1
-  //
-  // Valores:
-  //
-  // 0
-  // 1
-  // 2
-  // 3
-  // 4
-  // 5
   //
   // =========================================================
 
@@ -479,7 +509,7 @@ export function createLabPanel({
       state,
       'windSpeed',
       0,
-      5,
+      10,
       1,
 
       (v) => {
@@ -496,9 +526,9 @@ export function createLabPanel({
   );
 
 
-  // ---------------------------------------------------------
+  // =========================================================
   // KICK
-  // ---------------------------------------------------------
+  // =========================================================
 
   button(
     instruments,
@@ -539,7 +569,9 @@ export function createLabPanel({
       },
 
       () => {
-        return params.radialEnabled.value > 0;
+        return (
+          params.radialEnabled.value > 0
+        );
       }
     )
   );
@@ -579,7 +611,9 @@ export function createLabPanel({
       },
 
       () => {
-        return params.vortexEnabled.value > 0;
+        return (
+          params.vortexEnabled.value > 0
+        );
       }
     )
   );
@@ -619,7 +653,9 @@ export function createLabPanel({
       },
 
       () => {
-        return params.dragEnabled.value > 0;
+        return (
+          params.dragEnabled.value > 0
+        );
       }
     )
   );
@@ -663,7 +699,9 @@ export function createLabPanel({
       },
 
       () => {
-        return params.windEnabled.value > 0;
+        return (
+          params.windEnabled.value > 0
+        );
       }
     )
   );
@@ -675,8 +713,8 @@ export function createLabPanel({
       'wind.x',
       state,
       'windX',
-      -4,
-      4,
+      -10,
+      10,
       0.05,
 
       (v) => {
@@ -714,7 +752,7 @@ export function createLabPanel({
 
 
   // =========================================================
-  // PRUEBAS DE COMPORTAMIENTO
+  // PRUEBAS
   // =========================================================
 
   const tests =
@@ -727,6 +765,7 @@ export function createLabPanel({
 
   tests.innerHTML = `
     <h2>Pruebas de comportamiento</h2>
+
     <p>
       Antes de pulsar una prueba,
       predice qué debería ocurrir.
@@ -815,23 +854,7 @@ export function createLabPanel({
 
 
   // =========================================================
-  // SINCRONIZACIÓN
-  // =========================================================
-  //
-  // El teclado modifica params directamente desde main.js.
-  //
-  // Por ejemplo:
-  //
-  // Q → params.windDirection = -1
-  //
-  // Pero el input HTML no se entera automáticamente.
-  //
-  // Este pequeño sincronizador hace que los sliders reflejen
-  // esos cambios.
-  //
-  // No modifica la simulación.
-  // Solo actualiza la interfaz.
-  //
+  // SINCRONIZACIÓN CON TECLADO
   // =========================================================
 
   const syncInterval =
@@ -860,7 +883,8 @@ export function createLabPanel({
       params.windDirection.value;
 
     if (
-      speed <= 0
+      speed <= 0 ||
+      direction === 0
     ) {
       params.wind.value.set(
         0,
