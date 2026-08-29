@@ -1,36 +1,71 @@
-import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import { uniform, Vector3 } from 'three/tsl';
 
 export function createParameters() {
   return {
-    dt: uniform(1 / 60),
+    // Tiempo y límites
     timeScale: uniform(1.0),
-    initialSpeed: uniform(0.35),
-    maxSpeed: uniform(5.0),
-    boundsSize: uniform(10.0),
-    particleSize: uniform(0.035),
+    maxSpeed: uniform(4.0),
+
+    // Apariencia
+    particleSize: uniform(0.025),
+
+    // Posición del atractor
+    attractor: uniform(new Vector3(0, 0, 0)),
+
+    // Forma principal
+    // 0 = Arena
+    // 1 = Esfera
+    sphereBlend: uniform(0.0),
+
+    // Fuerza radial
+    radialEnabled: uniform(0.0),
+    radialStrength: uniform(0.0),
+
+    // Vórtice
+    vortexEnabled: uniform(0.0),
+    vortexStrength: uniform(0.0),
+
+    // Drag
+    dragEnabled: uniform(0.0),
+    dragCoefficient: uniform(0.08),
+
+    // Viento
     windEnabled: uniform(0.0),
-    wind: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    radialEnabled: uniform(1.0),
-    attractor: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    radialStrength: uniform(2.2),
-    softening: uniform(0.35),
-    // Transición de estado (0.0 = Arena, 1.0 = Esfera)
-    sphereBlend: uniform(1.0),
-    baseRadius: uniform(2.0),
-    // B: Kick / Bounce
+    wind: uniform(new Vector3(0, 0, 0)),
+
+    // Velocidad inicial usada por las pruebas de inercia
+    initialSpeed: uniform(0.0),
+
+    // Kick / Beat
     beat: uniform(0.0),
-    beatExpansion: uniform(6.0),
-    beatStrength: uniform(25.0),
-    // N: Estática
+    beatStrength: uniform(1.0),
+
+    // Estática / perturbación
     staticTrigger: uniform(0.0),
-    staticStrength: uniform(6.0),
-    // Controles de Órbita y Giro (Q/W y A/S)
-    spinDirection: uniform(1.0), // 1.0 (Derecha/W) o -1.0 (Izquierda/Q)
-    spinSpeed: uniform(1.5),     // Velocidad orbital ajustable (A/S)
-    vortexEnabled: uniform(1.0),
-    vortexStrength: uniform(1.4),
-    dragEnabled: uniform(1.0),
-    dragCoefficient: uniform(0.12)
+
+    // Dirección e intensidad del viento
+    // Q = -1
+    // W = +1
+    windDirection: uniform(1.0),
+
+    // A/S incrementa o reduce este valor de 1 en 1
+    windSpeed: uniform(0.0),
+
+    // Nuevos estados
+    mode: uniform(0.0),
+    // 0 = Arena
+    // 1 = Esfera
+    // 2 = Círculo
+    // 3 = Puntero
+
+    crazyEnabled: uniform(0.0),
+    compression: uniform(0.0),
+
+    // Color
+    colorIndex: uniform(0.0),
+    colorTransition: uniform(1.0),
+
+    // Cámara lenta
+    slowMotion: uniform(0.0)
   };
 }
