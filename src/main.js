@@ -93,7 +93,8 @@ async function main() {
       renderer.domElement
     );
 
-  orbit.enableDamping = true;
+  orbit.enableDamping =
+    true;
 
   orbit.target.set(
     0,
@@ -237,37 +238,29 @@ async function main() {
   );
 
   // =========================================================
-  // ESTADO DE LA APLICACIÓN
+  // ESTADO
   // =========================================================
 
-  let paused = false;
+  let paused =
+    false;
 
   let mode =
     'LAB';
 
-  // =========================================================
-  // ESTADO FÍSICO INICIAL
-  // =========================================================
-  //
-  // MUY IMPORTANTE:
-  //
-  // Al entrar:
-  //
-  // sphereBlend = 0
-  // initialSpeed = 0
-  // wind = 0
-  // radial = OFF
-  // vortex = OFF
-  // drag = OFF
-  // beat = 0
-  // static = 0
-  //
-  // Resultado:
-  //
-  // PARTÍCULAS COMPLETAMENTE QUIETAS.
-
   let targetSphereBlend =
     0.0;
+
+  // =========================================================
+  // ESTADO INICIAL
+  // =========================================================
+  //
+  // Todo comienza completamente quieto.
+  //
+  // Dirección = 0
+  // Velocidad = 0
+  //
+  // Por tanto no hay viento.
+  // =========================================================
 
   params.sphereBlend.value =
     0.0;
@@ -279,7 +272,7 @@ async function main() {
     0.0;
 
   params.windDirection.value =
-    1.0;
+    0.0;
 
   params.windSpeed.value =
     0.0;
@@ -309,182 +302,146 @@ async function main() {
   // KICK
   // =========================================================
 
-  const triggerBeat = () => {
-    params.beat.value =
-      1.0;
-  };
+  const triggerBeat =
+    () => {
+      params.beat.value =
+        1.0;
+    };
 
   // =========================================================
-  // ESTÁTICA / LOCURA TEMPORAL
+  // ESTÁTICA
   // =========================================================
 
-  const triggerStatic = () => {
-    params.staticTrigger.value =
-      Math.min(
-        2.0,
-        params.staticTrigger.value + 1.0
-      );
-  };
+  const triggerStatic =
+    () => {
+      params.staticTrigger.value =
+        Math.min(
+          2.0,
+          params.staticTrigger.value + 1.0
+        );
+    };
 
   // =========================================================
-  // MODO LEGACY
-  // =========================================================
-  //
-  // E ya no cambia modos.
-  //
-  // Lo dejamos definido solamente para evitar perder
-  // la posibilidad de utilizar esta transición internamente
-  // mientras reconstruimos los modos.
-
-  const toggleStateMode = () => {
-    targetSphereBlend =
-      targetSphereBlend === 1.0
-        ? 0.0
-        : 1.0;
-  };
-
-  // =========================================================
-  // PRESETS DEL LAB
+  // PRESETS
   // =========================================================
 
-  const applyPreset = (id) => {
-    // Apagar fuerzas anteriores.
-
-    params.windEnabled.value =
-      0.0;
-
-    params.radialEnabled.value =
-      0.0;
-
-    params.vortexEnabled.value =
-      0.0;
-
-    params.dragEnabled.value =
-      0.0;
-
-    params.wind.value.set(
-      0,
-      0,
-      0
-    );
-
-    params.initialSpeed.value =
-      0.0;
-
-    // -------------------------------------------------------
-    // Inercia
-    // -------------------------------------------------------
-
-    if (id === 'inertia') {
-      params.initialSpeed.value =
-        0.8;
-    }
-
-    // -------------------------------------------------------
-    // Viento
-    // -------------------------------------------------------
-
-    else if (id === 'wind') {
+  const applyPreset =
+    (id) => {
       params.windEnabled.value =
-        1.0;
+        0.0;
 
-      params.windDirection.value =
-        1.0;
+      params.radialEnabled.value =
+        0.0;
 
-      params.windSpeed.value =
-        1.0;
+      params.vortexEnabled.value =
+        0.0;
+
+      params.dragEnabled.value =
+        0.0;
 
       params.wind.value.set(
-        1.5,
+        0,
         0,
         0
       );
-    }
 
-    // -------------------------------------------------------
-    // Atracción
-    // -------------------------------------------------------
+      params.windSpeed.value =
+        0.0;
 
-    else if (id === 'attract') {
-      params.radialEnabled.value =
-        1.0;
+      if (
+        id === 'inertia'
+      ) {
+        params.initialSpeed.value =
+          0.8;
+      }
 
-      params.radialStrength.value =
-        3.0;
-    }
+      else if (
+        id === 'wind'
+      ) {
+        params.windDirection.value =
+          1.0;
 
-    // -------------------------------------------------------
-    // Repulsión
-    // -------------------------------------------------------
+        params.windSpeed.value =
+          1.0;
 
-    else if (id === 'repel') {
-      params.radialEnabled.value =
-        1.0;
+        updateWind();
+      }
 
-      params.radialStrength.value =
-        -3.0;
-    }
+      else if (
+        id === 'attract'
+      ) {
+        params.radialEnabled.value =
+          1.0;
 
-    // -------------------------------------------------------
-    // Vórtice
-    // -------------------------------------------------------
+        params.radialStrength.value =
+          3.0;
+      }
 
-    else if (id === 'vortex') {
-      params.radialEnabled.value =
-        1.0;
+      else if (
+        id === 'repel'
+      ) {
+        params.radialEnabled.value =
+          1.0;
 
-      params.radialStrength.value =
-        1.0;
+        params.radialStrength.value =
+          -3.0;
+      }
 
-      params.vortexEnabled.value =
-        1.0;
+      else if (
+        id === 'vortex'
+      ) {
+        params.radialEnabled.value =
+          1.0;
 
-      params.vortexStrength.value =
-        3.0;
+        params.radialStrength.value =
+          1.0;
 
-      params.dragEnabled.value =
-        1.0;
+        params.vortexEnabled.value =
+          1.0;
 
-      params.dragCoefficient.value =
-        0.08;
-    }
+        params.vortexStrength.value =
+          3.0;
 
-    // -------------------------------------------------------
-    // Reset de partículas
-    // -------------------------------------------------------
+        params.dragEnabled.value =
+          1.0;
 
-    simulation.reset();
-  };
+        params.dragCoefficient.value =
+          0.08;
+      }
+
+      simulation.reset();
+    };
 
   // =========================================================
   // LAB / PERFORMANCE
   // =========================================================
 
-  const setMode = (next) => {
-    mode =
-      next;
+  const setMode =
+    (next) => {
+      mode =
+        next;
 
-    const lab =
-      mode === 'LAB';
+      const lab =
+        mode === 'LAB';
 
-    document.body.classList.toggle(
-      'performance-mode',
-      !lab
-    );
+      document.body.classList.toggle(
+        'performance-mode',
+        !lab
+      );
 
-    panel.setVisible(
-      lab
-    );
+      panel.setVisible(
+        lab
+      );
 
-    axes.visible =
-      lab;
+      axes.visible =
+        lab;
 
-    attractorHelper.visible =
-      lab;
+      attractorHelper.visible =
+        lab;
 
-    performanceGuide.visible =
-      !lab;
-  };
+      performanceGuide.visible =
+        !lab;
+    };
 
   // =========================================================
   // PANEL
@@ -494,50 +451,51 @@ async function main() {
     createLabPanel({
       params,
 
-      onReset: () => {
-        // Reset vuelve al estado quieto.
+      onReset:
+        () => {
+          params.initialSpeed.value =
+            0.0;
 
-        params.initialSpeed.value =
-          0.0;
+          params.windEnabled.value =
+            0.0;
 
-        params.windEnabled.value =
-          0.0;
+          // Centro del slider.
+          params.windDirection.value =
+            0.0;
 
-        params.windDirection.value =
-          1.0;
+          // Inicio del slider.
+          params.windSpeed.value =
+            0.0;
 
-        params.windSpeed.value =
-          0.0;
+          params.wind.value.set(
+            0,
+            0,
+            0
+          );
 
-        params.wind.value.set(
-          0,
-          0,
-          0
-        );
+          params.radialEnabled.value =
+            0.0;
 
-        params.radialEnabled.value =
-          0.0;
+          params.vortexEnabled.value =
+            0.0;
 
-        params.vortexEnabled.value =
-          0.0;
+          params.dragEnabled.value =
+            0.0;
 
-        params.dragEnabled.value =
-          0.0;
+          params.beat.value =
+            0.0;
 
-        params.beat.value =
-          0.0;
+          params.staticTrigger.value =
+            0.0;
 
-        params.staticTrigger.value =
-          0.0;
+          params.sphereBlend.value =
+            0.0;
 
-        params.sphereBlend.value =
-          0.0;
+          targetSphereBlend =
+            0.0;
 
-        targetSphereBlend =
-          0.0;
-
-        simulation.reset();
-      },
+          simulation.reset();
+        },
 
       onPreset:
         applyPreset,
@@ -562,7 +520,7 @@ async function main() {
     });
 
   // =========================================================
-  // ARRANQUE EN LAB
+  // INICIO
   // =========================================================
 
   setMode(
@@ -576,8 +534,9 @@ async function main() {
   addEventListener(
     'keydown',
     (event) => {
-      // Ignorar repetición automática.
-      if (event.repeat) {
+      if (
+        event.repeat
+      ) {
         return;
       }
 
@@ -611,7 +570,7 @@ async function main() {
           0.0;
 
         params.windDirection.value =
-          1.0;
+          0.0;
 
         params.windSpeed.value =
           0.0;
@@ -656,26 +615,24 @@ async function main() {
         event.code === 'KeyB'
       ) {
         triggerBeat();
+
         return;
       }
 
       // -----------------------------------------------------
       // N = ESTÁTICA
-      //
-      // Por ahora mantenemos N funcionando como el efecto
-      // anterior. Más adelante lo convertiremos oficialmente
-      // en LOCURA.
       // -----------------------------------------------------
 
       if (
         event.code === 'KeyN'
       ) {
         triggerStatic();
+
         return;
       }
 
       // -----------------------------------------------------
-      // Q = VIENTO IZQUIERDA
+      // Q = DIRECCIÓN -1
       // -----------------------------------------------------
 
       if (
@@ -690,7 +647,7 @@ async function main() {
       }
 
       // -----------------------------------------------------
-      // W = VIENTO DERECHA
+      // W = DIRECCIÓN +1
       // -----------------------------------------------------
 
       if (
@@ -705,7 +662,9 @@ async function main() {
       }
 
       // -----------------------------------------------------
-      // A = VIENTO -1
+      // A = VELOCIDAD -1
+      //
+      // Mínimo = 0
       // -----------------------------------------------------
 
       if (
@@ -723,7 +682,9 @@ async function main() {
       }
 
       // -----------------------------------------------------
-      // S = VIENTO +1
+      // S = VELOCIDAD +1
+      //
+      // Máximo = 10
       // -----------------------------------------------------
 
       if (
@@ -731,7 +692,7 @@ async function main() {
       ) {
         params.windSpeed.value =
           Math.min(
-            5.0,
+            10.0,
             params.windSpeed.value + 1.0
           );
 
@@ -743,7 +704,7 @@ async function main() {
   );
 
   // =========================================================
-  // ACTUALIZAR VECTOR DEL VIENTO
+  // ACTUALIZAR VIENTO
   // =========================================================
 
   function updateWind() {
@@ -754,12 +715,12 @@ async function main() {
       params.windDirection.value;
 
     // -------------------------------------------------------
-    // Si la velocidad es 0:
-    //
-    // no existe viento.
+    // Sin velocidad
     // -------------------------------------------------------
 
-    if (speed <= 0) {
+    if (
+      speed <= 0
+    ) {
       params.wind.value.set(
         0,
         0,
@@ -773,10 +734,30 @@ async function main() {
     }
 
     // -------------------------------------------------------
-    // Viento exclusivamente horizontal.
+    // Sin dirección
+    // -------------------------------------------------------
+
+    if (
+      direction === 0
+    ) {
+      params.wind.value.set(
+        0,
+        0,
+        0
+      );
+
+      params.windEnabled.value =
+        0.0;
+
+      return;
+    }
+
+    // -------------------------------------------------------
+    // Dirección × velocidad
     //
-    // Q = izquierda
-    // W = derecha
+    // Q = -1
+    // W = +1
+    //
     // -------------------------------------------------------
 
     params.wind.value.set(
@@ -834,10 +815,7 @@ async function main() {
         );
 
       // -----------------------------------------------------
-      // Transición suave de esfera.
-      //
-      // Actualmente comienza en 0, así que no habrá ninguna
-      // transición automática al entrar.
+      // Transición de esfera
       // -----------------------------------------------------
 
       params.sphereBlend.value +=
@@ -851,7 +829,7 @@ async function main() {
         );
 
       // -----------------------------------------------------
-      // Decaimiento del kick.
+      // Decaimiento Kick
       // -----------------------------------------------------
 
       params.beat.value =
@@ -862,7 +840,7 @@ async function main() {
         );
 
       // -----------------------------------------------------
-      // Decaimiento de estática.
+      // Decaimiento estática
       // -----------------------------------------------------
 
       params.staticTrigger.value =
@@ -876,7 +854,9 @@ async function main() {
       // Simulación
       // -----------------------------------------------------
 
-      if (!paused) {
+      if (
+        !paused
+      ) {
         simulation.stepSimulation();
       }
 
