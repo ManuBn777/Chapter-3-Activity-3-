@@ -1,21 +1,5 @@
 import * as THREE from 'three/webgpu';
-import {
-  Fn,
-  If,
-  color,
-  hash,
-  instanceIndex,
-  instancedArray,
-  max,
-  mix,
-  step,
-  uint,
-  uv,
-  vec3,
-  vec4,
-  sin,
-  cos
-} from 'three/tsl';
+import { Fn, If, color, hash, instanceIndex, instancedArray, max, mix, step, uint, uv, vec3, vec4, sin, cos } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
@@ -32,9 +16,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r4 = hash(i.add(uint(53)));
     const r5 = hash(i.add(uint(71)));
     const r6 = hash(i.add(uint(89)));
-    const r7 = hash(i.add(uint(107)));
 
     const angle = r1.mul(6.28318530718);
+
     const arena = vec3(
       r1.sub(0.5).mul(8.0),
       r2.sub(0.5).mul(5.0),
@@ -42,7 +26,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     );
 
     const sphereDir =
-      vec3(r1, r2, r3).sub(0.5).normalize();
+      vec3(r1, r2, r3)
+        .sub(0.5)
+        .normalize();
 
     const sphere =
       sphereDir.mul(params.baseRadius);
@@ -63,45 +49,62 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       p.assign(circle);
     });
 
-    If(params.mode.greaterThan(2.5).and(params.mode.lessThan(4.5)), () => {
-      p.assign(sphere);
+    If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
+      p.assign(sphere.mul(0.8));
     });
 
+    If(params.mode.greaterThan(3.5), () => {
+      p.assign(sphere.mul(0.9));
+    });
+
+    // Give every particle an initial movement.
     v.assign(
-      vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed)
+      vec3(
+        r4.sub(0.5),
+        r5.sub(0.5),
+        r6.sub(0.5)
+      ).mul(0.5)
     );
   })().compute(count).setName('Initialize Particles');
 
   const updateParticles = Fn(() => {
     const p = positionBuffer.element(instanceIndex);
     const v = velocityBuffer.element(instanceIndex);
-    const dt = params.dt.mul(params.timeScale).mul(
-      params.slowMotion.mul(0.25).oneMinus().add(0.25)
-    );
+
+    const dt = params.dt
+      .mul(params.timeScale)
+      .mul(
+        params.slowMotion
+          .mul(0.25)
+          .oneMinus()
+          .add(0.25)
+      );
 
     // =======================================================
     // ARENA
     // =======================================================
+    // Continuous flowing field.
     If(params.mode.lessThan(0.5), () => {
-      // Permanent fluid flow. The arena is never frozen.
       const flow = vec3(
-        sin(p.y.mul(1.4).add(p.z.mul(0.8))).mul(3.0),
-        cos(p.x.mul(1.2).add(p.z.mul(1.1))).mul(2.0),
-        sin(p.x.mul(0.9).sub(p.y.mul(1.3))).mul(2.5)
+        sin(p.y.mul(1.2).add(p.z.mul(0.7))).mul(3.5),
+        cos(p.x.mul(1.1).add(p.z.mul(0.8))).mul(2.5),
+        sin(p.x.mul(0.8).sub(p.y.mul(1.0))).mul(3.0)
       );
 
-      // A/S = 0..10. Q/W = -1/+1.
-      // This is a direct velocity contribution, not a tiny force.
       const wind = vec3(
-        params.windDirection.mul(params.windSpeed).mul(5.0),
+        params.windDirection
+          .mul(params.windSpeed)
+          .mul(2.5),
         0.0,
         0.0
       );
 
-      const desired = flow.add(wind);
-
       v.assign(
-        mix(v, desired, 0.22)
+        mix(
+          v,
+          flow.add(wind),
+          0.18
+        )
       );
     });
 
@@ -109,36 +112,41 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // ESFERA
     // =======================================================
     If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
-      const normal = p.normalize();
-      const radius = p.length();
+      const radius = max(p.length(), 0.001);
+      const normal = p.div(radius);
       const radiusError = radius.sub(params.baseRadius);
 
-      const radial =
-        normal.mul(radiusError.negate().mul(10.0));
+      const radialCorrection =
+        normal
+          .mul(radiusError.negate())
+          .mul(12.0);
 
       const tangent =
-        vec3(0.0, 1.0, 0.0).cross(normal).mul(4.0);
+        vec3(0.0, 1.0, 0.0)
+          .cross(normal)
+          .mul(5.0);
 
       const surfaceFlow = vec3(
-        sin(p.y.mul(2.2)).mul(1.0),
-        cos(p.z.mul(2.0)).mul(1.0),
-        sin(p.x.mul(2.4)).mul(1.0)
+        sin(p.y.mul(2.0)).mul(0.8),
+        cos(p.z.mul(2.0)).mul(0.8),
+        sin(p.x.mul(2.0)).mul(0.8)
       );
 
       v.assign(
         mix(
           v,
-          radial.add(tangent).add(surfaceFlow),
-          0.18
+          radialCorrection
+            .add(tangent)
+            .add(surfaceFlow),
+          0.22
         )
       );
 
-      // Kick pushes the sphere outward.
       v.addAssign(
         normal
           .mul(params.beat)
           .mul(params.beatStrength)
-          .mul(20.0)
+          .mul(18.0)
           .mul(dt)
       );
     });
@@ -151,31 +159,38 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const radius = max(xy.length(), 0.001);
       const radial = xy.div(radius);
       const tangent = vec3(-radial.y, radial.x, 0.0);
-      const radiusError = radius.sub(params.baseRadius);
 
-      const shapeVelocity =
-        radial.mul(radiusError.negate().mul(14.0));
-
-      // Continuous rotation around the ring.
-      const circleFlow = tangent.mul(4.5);
-
-      // Kick creates visible radial spikes.
-      const spikes =
-        sin(p.x.mul(8.0).add(p.y.mul(6.0))).abs();
-
-      const kick =
+      const radiusCorrection =
         radial
-          .mul(spikes)
-          .mul(params.beat)
-          .mul(params.beatStrength)
-          .mul(28.0);
+          .mul(params.baseRadius.sub(radius))
+          .mul(18.0);
+
+      const circleVelocity =
+        tangent.mul(5.5);
 
       v.assign(
         mix(
           v,
-          shapeVelocity.add(circleFlow).add(kick),
-          0.20
+          radiusCorrection.add(circleVelocity),
+          0.25
         )
+      );
+
+      // Kick produces radial spikes.
+      const spikes =
+        sin(
+          p.x.mul(8.0)
+            .add(p.y.mul(7.0))
+        )
+          .abs();
+
+      v.addAssign(
+        radial
+          .mul(spikes)
+          .mul(params.beat)
+          .mul(params.beatStrength)
+          .mul(25.0)
+          .mul(dt)
       );
 
       v.z.assign(v.z.mul(0.05));
@@ -185,17 +200,30 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // PUNTERO
     // =======================================================
     If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
-      const toPointer = params.attractor.sub(p);
-      const distance = max(toPointer.length(), 0.05);
-      const direction = toPointer.div(distance);
-      const orbit = vec3(0.0, 0.0, 1.0).cross(direction);
+      const toPointer =
+        params.attractor.sub(p);
 
-      const pointerVelocity =
-        direction.mul(distance.mul(5.0).clamp(0.0, 12.0))
-          .add(orbit.mul(6.0));
+      const distance =
+        max(toPointer.length(), 0.05);
+
+      const direction =
+        toPointer.div(distance);
+
+      const orbit =
+        vec3(0.0, 0.0, 1.0)
+          .cross(direction);
+
+      const pointerFlow =
+        direction
+          .mul(distance.mul(3.5).clamp(0.0, 10.0))
+          .add(orbit.mul(7.0));
 
       v.assign(
-        mix(v, pointerVelocity, 0.14)
+        mix(
+          v,
+          pointerFlow,
+          0.18
+        )
       );
     });
 
@@ -204,22 +232,20 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // =======================================================
     If(params.mode.greaterThan(3.5), () => {
       const chaos = vec3(
-        sin(p.y.mul(7.0).add(params.beat.mul(10.0))),
-        cos(p.z.mul(8.0).add(params.beat.mul(13.0))),
-        sin(p.x.mul(9.0).sub(params.beat.mul(8.0)))
+        sin(p.y.mul(6.0).add(p.z.mul(2.0))),
+        cos(p.z.mul(7.0).add(p.x.mul(1.5))),
+        sin(p.x.mul(8.0).add(p.y.mul(1.3)))
       );
 
-      const randomFlow = vec3(
-        hash(instanceIndex.add(uint(401))).sub(0.5),
-        hash(instanceIndex.add(uint(809))).sub(0.5),
-        hash(instanceIndex.add(uint(1201))).sub(0.5)
-      );
+      const swirl =
+        vec3(-p.y, p.x, sin(p.z.mul(3.0)))
+          .mul(1.5);
 
       v.assign(
         mix(
           v,
-          chaos.mul(10.0).add(randomFlow.mul(7.0)),
-          0.12
+          chaos.mul(8.0).add(swirl),
+          0.15
         )
       );
     });
@@ -234,20 +260,21 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         direction
           .mul(params.beat)
           .mul(params.beatStrength)
-          .mul(10.0)
+          .mul(14.0)
           .mul(dt)
       );
     });
 
     // =======================================================
-    // ESTÁTICA
+    // STATIC
     // =======================================================
     If(params.staticTrigger.greaterThan(0.01), () => {
       const random = vec3(
         hash(instanceIndex.add(uint(13))),
         hash(instanceIndex.add(uint(23))),
         hash(instanceIndex.add(uint(37)))
-      ).sub(0.5);
+      )
+        .sub(0.5);
 
       v.addAssign(
         random
@@ -260,29 +287,50 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // =======================================================
     // COMPRESIÓN
     // =======================================================
-    const compression =
-      mix(1.0, 0.15, params.compression);
+    const compressionTarget =
+      p.mul(
+        mix(
+          1.0,
+          0.18,
+          params.compression
+        )
+      );
 
-    p.mulAssign(compression);
+    v.addAssign(
+      compressionTarget
+        .sub(p)
+        .mul(12.0)
+        .mul(params.compression)
+        .mul(dt)
+    );
 
     // =======================================================
-    // INTEGRACIÓN
+    // SPEED LIMIT
     // =======================================================
     const speed = v.length();
 
     If(speed.greaterThan(params.maxSpeed), () => {
-      v.assign(v.normalize().mul(params.maxSpeed));
+      v.assign(
+        v.normalize().mul(params.maxSpeed)
+      );
     });
 
+    // =======================================================
+    // POSITION
+    // =======================================================
     p.addAssign(v.mul(dt));
 
     // =======================================================
-    // ARENA BOUNDS
+    // ARENA WRAP
     // =======================================================
     If(params.mode.lessThan(0.5), () => {
       const half = params.boundsSize.mul(0.5);
+
       p.assign(
-        p.add(half).mod(params.boundsSize).sub(half)
+        p
+          .add(half)
+          .mod(params.boundsSize)
+          .sub(half)
       );
     });
   })().compute(count).setName('Update Particles');
@@ -297,8 +345,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     transparent: true
   });
 
-  material.positionNode = positionBuffer.toAttribute();
-  material.scaleNode = params.particleSize;
+  material.positionNode =
+    positionBuffer.toAttribute();
+
+  material.scaleNode =
+    params.particleSize;
 
   material.colorNode = Fn(() => {
     const index = params.colorIndex;
