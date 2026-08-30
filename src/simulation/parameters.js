@@ -19,6 +19,7 @@ export function createParameters() {
     pointerOrbitRadius: uniform(1.3),
 
     // MODOS
+    // 0 Arena, 1 Esfera, 2 Círculo, 3 Puntero, 4 Neutro
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
@@ -45,15 +46,29 @@ export function createParameters() {
     // INERCIA
     initialSpeed: uniform(0.0),
 
-    // KICK
+    // KICK (B) — empuje global desde el centro del mundo
     beat: uniform(0.0),
     beatStrength: uniform(1.0),
 
-    // ESTÁTICA
+    // ONDAS (click izquierdo) — hasta 4 simultáneas, cada una con
+    // su propio origen y "vida" (1 = recién creada, 0 = desaparecida)
+    ripple0Pos: uniform(new Vector3(0, 0, 0)),
+    ripple0Life: uniform(0.0),
+    ripple1Pos: uniform(new Vector3(0, 0, 0)),
+    ripple1Life: uniform(0.0),
+    ripple2Pos: uniform(new Vector3(0, 0, 0)),
+    ripple2Life: uniform(0.0),
+    ripple3Pos: uniform(new Vector3(0, 0, 0)),
+    ripple3Life: uniform(0.0),
+
+    // ESTÁTICA (N) — sin cambios
     staticTrigger: uniform(0.0),
     staticStrength: uniform(3.0),
 
-    // ARENA
+    // LOCURA (L) — agitación fuerte pero contenida cerca del centro
+    crazyTrigger: uniform(0.0),
+
+    // ARENA / NEUTRO — límite en caja 3D
     boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
 
     // CONTENCIÓN
@@ -70,8 +85,6 @@ export function createParameters() {
     slowMotion: uniform(0.0),
 
     // COLOR
-    // prevColorIndex guarda el color del que venimos, para poder
-    // hacer un cross-fade real hacia colorIndex en vez de un salto.
     colorIndex: uniform(0.0),
     prevColorIndex: uniform(0.0),
     colorTransition: uniform(1.0)
