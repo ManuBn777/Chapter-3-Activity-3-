@@ -16,11 +16,12 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const angle = r1.mul(6.28318530718);
 
-    const arena = vec3(
-      r1.sub(0.5).mul(8.0),
-      r2.sub(0.5).mul(5.0),
-      r3.sub(0.5).mul(6.0)
-    );
+    // Arena arranca como un punto pequeño y denso, no disperso.
+    const smallPoint = vec3(
+      r1.sub(0.5),
+      r2.sub(0.5),
+      r3.sub(0.5)
+    ).mul(0.35);
 
     const sphereDir =
       vec3(r1, r2, r3)
@@ -36,7 +37,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       0.0
     );
 
-    p.assign(arena);
+    p.assign(smallPoint);
 
     If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
       p.assign(sphere);
@@ -54,7 +55,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       p.assign(sphere.mul(0.9));
     });
 
-    // Estado idle: todas las partículas nacen completamente quietas.
     v.assign(vec3(0.0, 0.0, 0.0));
   })().compute(count).setName('Initialize Particles');
 
@@ -73,24 +73,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     If(params.activated.greaterThan(0.5), () => {
 
-      // =====================================================
-      // ARENA
-      // =====================================================
-      If(params.mode.lessThan(0.5), () => {
-        const flow = vec3(
-          sin(p.y.mul(1.2).add(p.z.mul(0.7))).mul(3.5),
-          cos(p.x.mul(1.1).add(p.z.mul(0.8))).mul(2.5),
-          sin(p.x.mul(0.8).sub(p.y.mul(1.0))).mul(3.0)
-        );
-
-        v.assign(
-          mix(
-            v,
-            flow,
-            0.18
-          )
-        );
-      });
+      // Nota: Arena (mode 0) ya no tiene un bloque propio.
+      // Su único movimiento viene del viento (universal, abajo),
+      // más kick/estática/compresión — "fluye según el botón
+      // que hayas presionado", nada más.
 
       // =====================================================
       // ESFERA
@@ -182,9 +168,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // =====================================================
       // PUNTERO
       // =====================================================
-      // Órbita estable alrededor del puntero (no colapsa a un punto):
-      // una corrección de radio (como en la Esfera) mantiene a las
-      // partículas circulando a params.pointerOrbitRadius de distancia.
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
           params.attractor.sub(p);
@@ -273,13 +256,15 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // VIENTO (aplica en TODOS los modos)
+      // VIENTO (universal, todos los modos, incluida Arena)
       // =====================================================
-      const wind = vec3(
-        params.windDirX.mul(params.windSpeed),
-        params.windDirY.mul(params.windSpeed),
+      const windDir = vec3(
+        cos(params.windAngle),
+        sin(params.windAngle),
         0.0
-      ).mul(5.0);
+      );
+
+      const wind = windDir.mul(params.windSpeed).mul(3.0);
 
       v.addAssign(wind.mul(dt));
 
@@ -304,6 +289,21 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
+      // CONTENCIÓN (red de seguridad esférica, no rectangular)
+      // =====================================================
+      const distFromCenter = max(p.length(), 0.001);
+      const centerNormal = p.div(distFromCenter);
+      const excess = max(distFromCenter.sub(params.containmentRadius), 0.0);
+
+      v.addAssign(
+        centerNormal
+          .negate()
+          .mul(excess)
+          .mul(3.0)
+          .mul(dt)
+      );
+
+      // =====================================================
       // SPEED LIMIT
       // =====================================================
       const speed = v.length();
@@ -318,20 +318,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // POSITION
       // =====================================================
       p.addAssign(v.mul(dt));
-
-      // =====================================================
-      // ARENA WRAP
-      // =====================================================
-      If(params.mode.lessThan(0.5), () => {
-        const half = params.boundsSize.mul(0.5);
-
-        p.assign(
-          p
-            .add(half)
-            .mod(params.boundsSize)
-            .sub(half)
-        );
-      });
     });
   })().compute(count).setName('Update Particles');
 
