@@ -8,6 +8,8 @@ import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 131072;
 const WIND_ROTATE_SPEED = 2.4;
+const WIND_SPEED_MIN = 0;
+const WIND_SPEED_MAX = 25;
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -109,8 +111,6 @@ async function main() {
   const activate = () => {
     if (!hasSpread) {
       hasSpread = true;
-      // Empujón inicial: separa las partículas del punto compacto
-      // en el que nacen, la primera vez que se sale del idle.
       params.staticTrigger.value = 2.5;
     }
 
@@ -198,23 +198,40 @@ async function main() {
   };
 
   const cycleColor = () => {
+    params.prevColorIndex.value = params.colorIndex.value;
     params.colorIndex.value = (params.colorIndex.value + 1) % 8;
     params.colorTransition.value = 0.0;
   };
 
+  // =========================================================
+  // VIENTO
+  // =========================================================
+
   const changeWindSpeed = (amount) => {
     activate();
-    windSpeedTarget = Math.max(0, Math.min(10, windSpeedTarget + amount));
+    windSpeedTarget = Math.max(
+      WIND_SPEED_MIN,
+      Math.min(WIND_SPEED_MAX, windSpeedTarget + amount)
+    );
   };
 
   const setWindSpeed = (value) => {
     activate();
-    windSpeedTarget = Math.max(0, Math.min(10, value));
+    windSpeedTarget = Math.max(
+      WIND_SPEED_MIN,
+      Math.min(WIND_SPEED_MAX, value)
+    );
   };
 
   const setWindAngle = (value) => {
     activate();
     params.windAngle.value = value;
+  };
+
+  // Saltos instantáneos de dirección, además de la rotación continua Q/W.
+  const rotateWindBy = (radians) => {
+    activate();
+    params.windAngle.value += radians;
   };
 
   const reset = () => {
@@ -235,6 +252,7 @@ async function main() {
     params.staticTrigger.value = 0.0;
 
     params.colorIndex.value = 0.0;
+    params.prevColorIndex.value = 0.0;
     params.colorTransition.value = 1.0;
 
     flashAmount = 0;
@@ -255,6 +273,9 @@ async function main() {
     onStatic: triggerStatic,
     onWindSpeed: setWindSpeed,
     onWindAngle: setWindAngle,
+    onWindFlip180: () => rotateWindBy(Math.PI),
+    onWindTurn90: () => rotateWindBy(Math.PI / 2),
+    onWindTurnMinus90: () => rotateWindBy(-Math.PI / 2),
     onModeChange: () => {
       setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     },
@@ -323,6 +344,18 @@ async function main() {
       case 'KeyS':
         changeWindSpeed(1);
         break;
+
+      case 'KeyE':
+        rotateWindBy(Math.PI);
+        break;
+
+      case 'KeyX':
+        rotateWindBy(Math.PI / 2);
+        break;
+
+      case 'KeyZ':
+        rotateWindBy(-Math.PI / 2);
+        break;
     }
   });
 
@@ -353,10 +386,20 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
-    params.windSpeed.value +=
-      (windSpeedTarget - params.windSpeed.value) * Math.min(1, delta * 4);
+    // Suaviza windSpeed hacia el objetivo, pero con "snap" cuando ya
+    // está muy cerca — así llegar a 0 (o a cualquier valor) es un
+    // freno real, no una aproximación infinita que nunca se detiene.
+    const windDiff = windSpeedTarget - params.windSpeed.value;
 
-    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 5);
+    if (Math.abs(windDiff) < 0.02) {
+      params.windSpeed.value = windSpeedTarget;
+    } else {
+      params.windSpeed.value += windDiff * Math.min(1, delta * 4);
+    }
+
+    // Cross-fade de color más lento y fluido (~0.4s).
+    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 2.5);
+
     params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
     params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
