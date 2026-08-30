@@ -265,6 +265,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
+      // GRANO (jitter permanente por partícula — "arena real")
+      // =====================================================
+      // Cada partícula tiene una fase personal fija (basada en su
+      // índice) que la hace oscilar ligeramente distinto a sus
+      // vecinas, todo el tiempo. Evita que se sincronicen/agrupen
+      // otra vez después de cualquier separación, sin necesidad
+      // de repetir Estática (N) manualmente.
+      const grainPhase = hash(instanceIndex.add(uint(101)));
+
+      const grain = vec3(
+        sin(grainPhase.mul(37.0).add(p.x.mul(3.0))),
+        cos(grainPhase.mul(53.0).add(p.y.mul(3.0))),
+        sin(grainPhase.mul(71.0).add(p.z.mul(3.0)))
+      );
+
+      v.addAssign(grain.mul(0.7).mul(dt));
+
+      // =====================================================
       // VIENTO (universal, todos los modos)
       // =====================================================
       const windDir = vec3(
@@ -360,9 +378,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   material.scaleNode =
     params.particleSize;
 
-  // Paleta reutilizable: dado un índice (0-7), devuelve el color
-  // correspondiente. Se llama dos veces (color previo y color
-  // actual) para poder hacer cross-fade entre ambos.
   const paletteColor = (index) => {
     const c0 = color('#ff365e');
     const c1 = color('#ff8a32');
