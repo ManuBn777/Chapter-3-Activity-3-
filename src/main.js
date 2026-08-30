@@ -2,7 +2,6 @@ import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
 import './styles.css';
-
 import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
@@ -11,7 +10,6 @@ const PARTICLE_COUNT = 131072;
 
 async function main() {
   const mount = document.querySelector('#app');
-
   if (!WebGPU.isAvailable()) {
     mount.appendChild(WebGPU.getErrorMessage());
     throw new Error('Este proyecto requiere WebGPU para ejecutar compute shaders.');
@@ -19,7 +17,6 @@ async function main() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#050607');
-
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
   camera.position.set(0, 0, 11);
 
@@ -56,7 +53,7 @@ async function main() {
   scene.add(axes);
 
   let paused = false;
-  let mode = 'LAB';
+  let uiMode = 'LAB';
   let compressionHeld = false;
 
   const pointerNdc = new THREE.Vector2();
@@ -68,7 +65,6 @@ async function main() {
     pointerNdc.x = (event.clientX / innerWidth) * 2 - 1;
     pointerNdc.y = -(event.clientY / innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointerNdc, camera);
-
     if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
       params.attractor.value.copy(hit);
       attractorHelper.position.copy(hit);
@@ -79,9 +75,7 @@ async function main() {
   addEventListener('contextmenu', (event) => event.preventDefault());
 
   addEventListener('pointerdown', (event) => {
-    if (event.button === 0) {
-      params.beat.value = Math.max(params.beat.value, 0.9);
-    }
+    if (event.button === 0) params.beat.value = 1.0;
     if (event.button === 2) {
       compressionHeld = true;
       params.compression.value = 1.0;
@@ -95,9 +89,9 @@ async function main() {
     }
   });
 
-  const setMode = (next) => {
-    mode = next;
-    const lab = mode === 'LAB';
+  const setUiMode = (next) => {
+    uiMode = next;
+    const lab = uiMode === 'LAB';
     document.body.classList.toggle('performance-mode', !lab);
     panel.setVisible(lab);
     axes.visible = lab;
@@ -111,42 +105,28 @@ async function main() {
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = next === 3 ? 1.0 : 0.0;
     params.crazyEnabled.value = next === 4 ? 1.0 : 0.0;
-    attractorHelper.visible = mode === 'LAB' && next === 3;
-    performanceGuide.visible = mode === 'PERFORMANCE' && next === 3;
+    attractorHelper.visible = uiMode === 'LAB' && next === 3;
+    performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
     simulation.reset();
   };
 
-  const triggerBeat = () => {
-    params.beat.value = 1.0;
-  };
-
+  const triggerBeat = () => { params.beat.value = 1.0; };
+  const triggerStatic = () => { params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0); };
+  const triggerFlash = () => { params.flash.value = 1.0; };
+  const toggleSlow = () => { params.slowMotion.value = params.slowMotion.value > 0.5 ? 0.0 : 1.0; };
   const cycleColor = () => {
     params.colorIndex.value = (params.colorIndex.value + 1) % 8;
     params.colorTransition.value = 0.0;
   };
 
-  const triggerFlash = () => {
-    params.flash.value = 1.0;
-  };
-
-  const toggleSlow = () => {
-    params.slowMotion.value = params.slowMotion.value > 0.5 ? 0.0 : 1.0;
-  };
-
-  const triggerStatic = () => {
-    params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
-  };
-
   const updateWind = () => {
     const speed = params.windSpeed.value;
     const direction = params.windDirection.value;
-
     if (speed <= 0 || direction === 0) {
       params.wind.value.set(0, 0, 0);
       params.windEnabled.value = 0;
       return;
     }
-
     params.wind.value.set(direction * speed, 0, 0);
     params.windEnabled.value = 1;
   };
@@ -155,8 +135,15 @@ async function main() {
     params.windSpeed.value = Math.max(0, Math.min(10, params.windSpeed.value + amount));
     updateWind();
   };
-
+  const setWindSpeed = (value) => {
+    params.windSpeed.value = Math.max(0, Math.min(10, value));
+    updateWind();
+  };
   const changeWindDirection = (direction) => {
+    params.windDirection.value = direction;
+    updateWind();
+  };
+  const setWindDirection = (direction) => {
     params.windDirection.value = direction;
     updateWind();
   };
@@ -190,19 +177,18 @@ async function main() {
     onColor: cycleColor,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
-    onWindSpeed: changeWindSpeed,
-    onWindDirection: changeWindDirection,
-    onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
+    onWindSpeed: setWindSpeed,
+    onWindDirection: setWindDirection,
+    onModeChange: () => setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; }
   });
 
-  setMode('LAB');
+  setUiMode('LAB');
   setParticleMode(0);
 
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
-
-    if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
+    if (event.code === 'KeyP') setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     else if (event.code === 'KeyR') reset();
     else if (event.code === 'KeyB') triggerBeat();
     else if (event.code === 'KeyN') triggerStatic();
@@ -227,21 +213,16 @@ async function main() {
   });
 
   simulation.reset();
-
   const clock = new THREE.Clock();
 
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
-
     params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 5);
     params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
     params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
-
     if (!compressionHeld) params.compression.value = Math.max(0, params.compression.value - delta * 8.0);
-
     if (!paused) simulation.stepSimulation();
-
     orbit.update();
     renderer.render(scene, camera);
   });
