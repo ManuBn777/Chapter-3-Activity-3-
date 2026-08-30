@@ -19,7 +19,6 @@ async function main() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#050607');
 
-  // Cámara fija al centro del sistema.
   const camera = new THREE.PerspectiveCamera(
     50,
     innerWidth / innerHeight,
@@ -34,15 +33,6 @@ async function main() {
   renderer.setSize(innerWidth, innerHeight);
   mount.appendChild(renderer.domElement);
   await renderer.init();
-
-  // =========================================================
-  // CÁMARA
-  // =========================================================
-  //
-  // La cámara NO rota con click izquierdo/derecho.
-  // Tampoco hace pan.
-  // La rueda puede seguir haciendo zoom.
-  // =========================================================
 
   const orbit = new OrbitControls(
     camera,
@@ -66,10 +56,6 @@ async function main() {
     count: PARTICLE_COUNT
   });
 
-  // =========================================================
-  // FLASH DE PANTALLA
-  // =========================================================
-
   const flashOverlay = document.createElement('div');
   flashOverlay.className = 'flash-overlay';
   document.body.appendChild(flashOverlay);
@@ -80,10 +66,6 @@ async function main() {
     flashAmount = 1;
     params.flash.value = 1;
   };
-
-  // =========================================================
-  // HELPERS VISUALES
-  // =========================================================
 
   const attractorHelper = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 16, 12),
@@ -107,10 +89,6 @@ async function main() {
   const axes = new THREE.AxesHelper(1.5);
   scene.add(axes);
 
-  // =========================================================
-  // ESTADO
-  // =========================================================
-
   let paused = false;
   let uiMode = 'LAB';
   let compressionHeld = false;
@@ -123,60 +101,34 @@ async function main() {
   );
   const hit = new THREE.Vector3();
 
-  // Saca el sistema del estado idle en la primera interacción real.
-  // Antes de esto, positions/velocities quedan congeladas en el GPU.
   const activate = () => {
     params.activated.value = 1;
   };
 
-  // =========================================================
-  // PUNTERO
-  // =========================================================
-
   addEventListener('pointermove', (event) => {
-    pointerNdc.x =
-      (event.clientX / innerWidth) * 2 - 1;
+    pointerNdc.x = (event.clientX / innerWidth) * 2 - 1;
+    pointerNdc.y = -(event.clientY / innerHeight) * 2 + 1;
 
-    pointerNdc.y =
-      -(event.clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
 
-    raycaster.setFromCamera(
-      pointerNdc,
-      camera
-    );
-
-    if (
-      raycaster.ray.intersectPlane(
-        interactionPlane,
-        hit
-      )
-    ) {
+    if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
       params.attractor.value.copy(hit);
       attractorHelper.position.copy(hit);
       performanceGuide.position.copy(hit);
     }
   });
 
-  // Nunca abrir menú contextual.
   addEventListener('contextmenu', (event) => {
     event.preventDefault();
   });
 
-  // =========================================================
-  // MOUSE
-  // =========================================================
-
   addEventListener('pointerdown', (event) => {
     activate();
 
-    // Click izquierdo = onda / kick.
-    // OrbitControls tiene rotate desactivado, por lo que esto
-    // ya no mueve la cámara.
     if (event.button === 0) {
       params.beat.value = 1.0;
     }
 
-    // Click derecho mantenido = compresión.
     if (event.button === 2) {
       compressionHeld = true;
       params.compression.value = 1.0;
@@ -195,59 +147,29 @@ async function main() {
     params.compression.value = 0.0;
   });
 
-  // =========================================================
-  // MODOS
-  // =========================================================
-  // Mapa final: Arena, Esfera, Círculo, Puntero (4 modos).
-  // "Locas" deja de ser un modo seleccionable — vuelve más
-  // adelante como efecto (tecla N).
-
   const setUiMode = (next) => {
     uiMode = next;
-
     const lab = uiMode === 'LAB';
 
-    document.body.classList.toggle(
-      'performance-mode',
-      !lab
-    );
-
+    document.body.classList.toggle('performance-mode', !lab);
     panel.setVisible(lab);
-
     axes.visible = lab;
 
-    attractorHelper.visible =
-      lab && params.mode.value === 3;
-
-    performanceGuide.visible =
-      !lab && params.mode.value === 3;
+    attractorHelper.visible = lab && params.mode.value === 3;
+    performanceGuide.visible = !lab && params.mode.value === 3;
   };
 
   const setParticleMode = (next) => {
     params.mode.value = next;
-
-    // Mantener compatibilidad con el parámetro antiguo.
-    params.sphereBlend.value =
-      next === 1 ? 1.0 : 0.0;
-
+    params.sphereBlend.value = next === 1 ? 1.0 : 0.0;
     params.radialEnabled.value = 0.0;
+    params.vortexEnabled.value = next === 3 ? 1.0 : 0.0;
 
-    params.vortexEnabled.value =
-      next === 3 ? 1.0 : 0.0;
+    attractorHelper.visible = uiMode === 'LAB' && next === 3;
+    performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
 
-    attractorHelper.visible =
-      uiMode === 'LAB' && next === 3;
-
-    performanceGuide.visible =
-      uiMode === 'PERFORMANCE' && next === 3;
-
-    // Cada cambio de modo empieza desde una configuración limpia.
     simulation.reset();
   };
-
-  // =========================================================
-  // EFECTOS
-  // =========================================================
 
   const triggerBeat = () => {
     activate();
@@ -256,113 +178,51 @@ async function main() {
 
   const triggerStatic = () => {
     activate();
-    params.staticTrigger.value = Math.min(
-      2.0,
-      params.staticTrigger.value + 1.0
-    );
+    params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
   };
 
   const toggleSlow = () => {
-    params.slowMotion.value =
-      params.slowMotion.value > 0.5
-        ? 0.0
-        : 1.0;
+    params.slowMotion.value = params.slowMotion.value > 0.5 ? 0.0 : 1.0;
   };
 
   const cycleColor = () => {
-    params.colorIndex.value =
-      (params.colorIndex.value + 1) % 8;
-
+    params.colorIndex.value = (params.colorIndex.value + 1) % 8;
     params.colorTransition.value = 0.0;
   };
 
   // =========================================================
   // VIENTO
   // =========================================================
+  // windDirX/windDirY: -1/0/1. windSpeed: 0..10 (magnitud, comparte
+  // eje X e Y). Q/W mueven en X. ArrowUp/ArrowDown mueven en Y.
 
-  const updateWind = () => {
-    const speed =
-      params.windSpeed.value;
-
-    const direction =
-      params.windDirection.value;
-
-    if (
-      speed <= 0 ||
-      direction === 0
-    ) {
-      params.wind.value.set(0, 0, 0);
-      params.windEnabled.value = 0;
-      return;
-    }
-
-    params.wind.value.set(
-      direction * speed,
-      0,
-      0
-    );
-
-    params.windEnabled.value = 1;
-  };
-
-  // Teclado: cambia de 1 en 1.
   const changeWindSpeed = (amount) => {
     activate();
 
     params.windSpeed.value = Math.max(
       0,
-      Math.min(
-        10,
-        params.windSpeed.value + amount
-      )
+      Math.min(10, params.windSpeed.value + amount)
     );
-
-    updateWind();
   };
 
-  // Slider: establece el valor directamente.
   const setWindSpeed = (value) => {
     activate();
-
-    params.windSpeed.value = Math.max(
-      0,
-      Math.min(10, value)
-    );
-
-    updateWind();
+    params.windSpeed.value = Math.max(0, Math.min(10, value));
   };
 
-  // Q/W siempre establecen la dirección completa.
-  const changeWindDirection = (direction) => {
+  const setWindDirection = (dx, dy) => {
     activate();
-
-    params.windDirection.value =
-      direction;
-
-    updateWind();
+    params.windDirX.value = dx;
+    params.windDirY.value = dy;
   };
-
-  const setWindDirection = (direction) => {
-    activate();
-
-    params.windDirection.value =
-      direction;
-
-    updateWind();
-  };
-
-  // =========================================================
-  // RESET
-  // =========================================================
 
   const reset = () => {
     params.timeScale.value = 1.0;
     params.maxSpeed.value = 30.0;
 
-    params.windEnabled.value = 0.0;
-    params.windDirection.value = 0.0;
     params.windSpeed.value = 0.0;
-    params.wind.value.set(0, 0, 0);
+    params.windDirX.value = 1.0;
+    params.windDirY.value = 0.0;
 
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
@@ -377,16 +237,10 @@ async function main() {
     params.colorTransition.value = 1.0;
 
     flashAmount = 0;
-
-    // Reset vuelve al sistema al estado idle inicial.
     params.activated.value = 0;
 
     setParticleMode(0);
   };
-
-  // =========================================================
-  // PANEL
-  // =========================================================
 
   const panel = createLabPanel({
     params,
@@ -398,13 +252,9 @@ async function main() {
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onWindSpeed: setWindSpeed,
-    onWindDirection: setWindDirection,
+    onWindDirection: (v) => setWindDirection(v, 0),
     onModeChange: () => {
-      setUiMode(
-        uiMode === 'LAB'
-          ? 'PERFORMANCE'
-          : 'LAB'
-      );
+      setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     },
     onPauseChange: () => {
       paused = !paused;
@@ -414,21 +264,12 @@ async function main() {
   setUiMode('LAB');
   setParticleMode(0);
 
-  // =========================================================
-  // TECLADO
-  // =========================================================
-  // Solo 4 modos (Digit1–Digit4). Digit5/KeyE quedan libres.
-
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
 
     switch (event.code) {
       case 'KeyP':
-        setUiMode(
-          uiMode === 'LAB'
-            ? 'PERFORMANCE'
-            : 'LAB'
-        );
+        setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
         break;
 
       case 'KeyR':
@@ -472,11 +313,19 @@ async function main() {
         break;
 
       case 'KeyQ':
-        changeWindDirection(-1);
+        setWindDirection(-1, 0);
         break;
 
       case 'KeyW':
-        changeWindDirection(1);
+        setWindDirection(1, 0);
+        break;
+
+      case 'ArrowUp':
+        setWindDirection(0, 1);
+        break;
+
+      case 'ArrowDown':
+        setWindDirection(0, -1);
         break;
 
       case 'KeyA':
@@ -489,72 +338,31 @@ async function main() {
     }
   });
 
-  // =========================================================
-  // RESIZE
-  // =========================================================
-
   addEventListener('resize', () => {
-    camera.aspect =
-      innerWidth / innerHeight;
-
+    camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(
-      innerWidth,
-      innerHeight
-    );
+    renderer.setSize(innerWidth, innerHeight);
   });
 
   simulation.reset();
 
   const clock = new THREE.Clock();
 
-  // =========================================================
-  // LOOP
-  // =========================================================
-
   renderer.setAnimationLoop(() => {
-    const delta = Math.min(
-      clock.getDelta(),
-      0.05
-    );
+    const delta = Math.min(clock.getDelta(), 0.05);
 
-    params.colorTransition.value =
-      Math.min(
-        1,
-        params.colorTransition.value + delta * 5
-      );
-
-    params.beat.value = Math.max(
-      0,
-      params.beat.value - delta * 5.0
-    );
-
-    params.staticTrigger.value = Math.max(
-      0,
-      params.staticTrigger.value - delta * 4.0
-    );
-
-    params.flash.value = Math.max(
-      0,
-      params.flash.value - delta * 5.0
-    );
+    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 5);
+    params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
+    params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
+    params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
 
     if (!compressionHeld) {
-      params.compression.value = Math.max(
-        0,
-        params.compression.value - delta * 8.0
-      );
+      params.compression.value = Math.max(0, params.compression.value - delta * 8.0);
     }
 
-    // Flash físico de pantalla: blanco y fade rápido.
     if (flashAmount > 0) {
-      flashAmount = Math.max(
-        0,
-        flashAmount - delta * 1.8
-      );
-
-      flashOverlay.style.opacity =
-        String(flashAmount);
+      flashAmount = Math.max(0, flashAmount - delta * 1.8);
+      flashOverlay.style.opacity = String(flashAmount);
     } else {
       flashOverlay.style.opacity = '0';
     }
@@ -564,10 +372,7 @@ async function main() {
     }
 
     orbit.update();
-    renderer.render(
-      scene,
-      camera
-    );
+    renderer.render(scene, camera);
   });
 }
 
