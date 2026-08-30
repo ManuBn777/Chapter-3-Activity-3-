@@ -65,9 +65,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .mul(params.timeScale)
       .mul(
         params.slowMotion
-          .mul(0.25)
           .oneMinus()
-          .add(0.25)
+          .mul(0.82)
+          .add(0.18)
       );
 
     If(params.activated.greaterThan(0.5), () => {
