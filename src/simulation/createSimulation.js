@@ -36,6 +36,14 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       0.0
     );
 
+    // Neutro: repartidas por todo el espacio (como Arena antes de
+    // que Arena se volviera un punto compacto).
+    const scattered = vec3(
+      r1.sub(0.5),
+      r2.sub(0.5),
+      r3.sub(0.5)
+    ).mul(params.boundsSize);
+
     p.assign(smallPoint);
 
     If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
@@ -51,7 +59,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     If(params.mode.greaterThan(3.5), () => {
-      p.assign(sphere.mul(0.9));
+      p.assign(scattered);
     });
 
     v.assign(vec3(0.0, 0.0, 0.0));
@@ -208,30 +216,22 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // LOCAS
+      // NEUTRO — agua calmada, fluye muy suave por todo el espacio
       // =====================================================
       If(params.mode.greaterThan(3.5), () => {
-        const chaos = vec3(
-          sin(p.y.mul(6.0).add(p.z.mul(2.0))),
-          cos(p.z.mul(7.0).add(p.x.mul(1.5))),
-          sin(p.x.mul(8.0).add(p.y.mul(1.3)))
+        const calmFlow = vec3(
+          sin(p.y.mul(0.5).add(p.z.mul(0.3))).mul(0.4),
+          cos(p.x.mul(0.4).add(p.z.mul(0.3))).mul(0.3),
+          sin(p.x.mul(0.3).sub(p.y.mul(0.4))).mul(0.35)
         );
 
-        const swirl =
-          vec3(p.y.negate(), p.x, sin(p.z.mul(3.0)))
-            .mul(1.5);
-
         v.assign(
-          mix(
-            v,
-            chaos.mul(8.0).add(swirl),
-            0.15
-          )
+          mix(v, calmFlow, 0.05)
         );
       });
 
       // =====================================================
-      // KICK
+      // KICK (B) — empuje global desde el centro del mundo
       // =====================================================
       If(params.beat.greaterThan(0.01), () => {
         const direction = p.normalize();
@@ -246,7 +246,32 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // STATIC
+      // ONDAS (click izquierdo) — hasta 4 gotas en agua simultáneas
+      // =====================================================
+      const rippleForce = (origin, life) => {
+        const toParticle = p.sub(origin);
+        const dist = max(toParticle.length(), 0.001);
+        const dir = toParticle.div(dist);
+
+        const ringRadius = life.oneMinus().mul(5.0);
+        const ringWidth = 1.0;
+
+        const diff = dist.sub(ringRadius).abs();
+        const falloff = max(diff.div(ringWidth).oneMinus(), 0.0);
+
+        return dir.mul(falloff).mul(life).mul(9.0);
+      };
+
+      v.addAssign(
+        rippleForce(params.ripple0Pos, params.ripple0Life)
+          .add(rippleForce(params.ripple1Pos, params.ripple1Life))
+          .add(rippleForce(params.ripple2Pos, params.ripple2Life))
+          .add(rippleForce(params.ripple3Pos, params.ripple3Life))
+          .mul(dt)
+      );
+
+      // =====================================================
+      // STATIC (N) — sin cambios
       // =====================================================
       If(params.staticTrigger.greaterThan(0.01), () => {
         const random = vec3(
@@ -265,13 +290,27 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // GRANO (jitter permanente por partícula — "arena real")
+      // LOCURA (L) — se agitan fuerte pero se quedan cerca/dentro
       // =====================================================
-      // Cada partícula tiene una fase personal fija (basada en su
-      // índice) que la hace oscilar ligeramente distinto a sus
-      // vecinas, todo el tiempo. Evita que se sincronicen/agrupen
-      // otra vez después de cualquier separación, sin necesidad
-      // de repetir Estática (N) manualmente.
+      If(params.crazyTrigger.greaterThan(0.01), () => {
+        const shake = vec3(
+          sin(p.y.mul(9.0).add(p.z.mul(5.0))),
+          cos(p.z.mul(11.0).add(p.x.mul(6.0))),
+          sin(p.x.mul(10.0).add(p.y.mul(4.0)))
+        );
+
+        const pull = p.negate().mul(0.8);
+
+        v.addAssign(
+          shake.mul(9.0).add(pull)
+            .mul(params.crazyTrigger)
+            .mul(dt)
+        );
+      });
+
+      // =====================================================
+      // GRANO (jitter permanente por partícula)
+      // =====================================================
       const grainPhase = hash(instanceIndex.add(uint(101)));
 
       const grain = vec3(
@@ -347,9 +386,20 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       p.addAssign(v.mul(dt));
 
       // =====================================================
-      // ARENA WRAP
+      // ARENA / NEUTRO WRAP (límite en caja 3D)
       // =====================================================
       If(params.mode.lessThan(0.5), () => {
+        const half = params.boundsSize.mul(0.5);
+
+        p.assign(
+          p
+            .add(half)
+            .mod(params.boundsSize)
+            .sub(half)
+        );
+      });
+
+      If(params.mode.greaterThan(3.5), () => {
         const half = params.boundsSize.mul(0.5);
 
         p.assign(
