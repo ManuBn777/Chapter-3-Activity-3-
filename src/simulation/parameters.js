@@ -40,12 +40,11 @@ export function createParameters() {
     dragCoefficient: uniform(0.08),
 
     // VIENTO
-    // windDirX/windDirY: -1/0/1 cada uno. Q/W mueven X, ArrowUp/ArrowDown mueven Y.
-    // windSpeed: 0 (quieto) a 10 (rápido). Se aplica en TODOS los modos.
-    windEnabled: uniform(0.0),
-    wind: uniform(new Vector3(0, 0, 0)),
-    windDirX: uniform(1.0),
-    windDirY: uniform(0.0),
+    // windAngle: ángulo continuo en radianes. Q resta, W suma
+    // (mantenidas presionadas = rotación continua).
+    // windSpeed: 0..10, se suaviza en JS hacia un objetivo (A/S)
+    // para que arrancar/detenerse sea gradual, no un salto.
+    windAngle: uniform(0.0),
     windSpeed: uniform(0.0),
 
     // INERCIA
@@ -59,8 +58,11 @@ export function createParameters() {
     staticTrigger: uniform(0.0),
     staticStrength: uniform(3.0),
 
-    // ARENA
-    boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
+    // CONTENCIÓN
+    // Red de seguridad esférica (no rectangular): solo actúa muy
+    // lejos del centro, para que Arena no tenga límites en forma
+    // de caja pero tampoco pierda partículas al infinito.
+    containmentRadius: uniform(14.0),
 
     // COMPATIBILIDAD
     spinDirection: uniform(0.0),
