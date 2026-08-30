@@ -14,786 +14,296 @@ import {
   uv,
   vec3,
   vec4,
-  sin
+  sin,
+  cos
 } from 'three/tsl';
 
-export function createSimulation({
-  renderer,
-  scene,
-  params,
-  count = 131072
-}) {
-  // =========================================================
-  // BUFFERS GPU
-  // =========================================================
+export function createSimulation({ renderer, scene, params, count = 131072 }) {
+  const positionBuffer = instancedArray(count, 'vec3');
+  const velocityBuffer = instancedArray(count, 'vec3');
 
-  const positionBuffer =
-    instancedArray(
-      count,
-      'vec3'
-    );
+  const initParticles = Fn(() => {
+    const i = instanceIndex;
+    const p = positionBuffer.element(i);
+    const v = velocityBuffer.element(i);
 
-  const velocityBuffer =
-    instancedArray(
-      count,
-      'vec3'
-    );
+    const r1 = hash(i.add(uint(11)));
+    const r2 = hash(i.add(uint(23)));
+    const r3 = hash(i.add(uint(37)));
+    const r4 = hash(i.add(uint(53)));
+    const r5 = hash(i.add(uint(71)));
+    const r6 = hash(i.add(uint(89)));
+    const r7 = hash(i.add(uint(107)));
 
-  // =========================================================
-  // INICIALIZACIÓN
-  // =========================================================
+    const dir = vec3(r1, r2, r3).sub(0.5).normalize();
+    const radius = r7.pow(1.0 / 3.0).mul(params.baseRadius);
 
-  const initParticles =
-    Fn(() => {
-      const i =
-        instanceIndex;
+    p.assign(dir.mul(radius));
+    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
+  })().compute(count).setName('Initialize Particles');
 
-      const p =
-        positionBuffer.element(i);
+  const updateParticles = Fn(() => {
+    const p = positionBuffer.element(instanceIndex);
+    const v = velocityBuffer.element(instanceIndex);
+    const dt = params.dt.mul(params.timeScale).mul(params.slowMotion.oneMinus().mul(0.75).add(0.25));
+    const force = vec3(0.0).toVar();
+    const distFromCenter = p.length();
 
-      const v =
-        velocityBuffer.element(i);
+    // =======================================================
+    // ARENA / VIENTO
+    // =======================================================
+    If(params.mode.lessThan(0.5), () => {
+      const toAttractor = params.attractor.sub(p);
+      const distance = max(toAttractor.length(), params.softening);
+      const radialDirection = toAttractor.div(distance);
 
-      const r1 =
-        hash(i.add(uint(11)));
-
-      const r2 =
-        hash(i.add(uint(23)));
-
-      const r3 =
-        hash(i.add(uint(37)));
-
-      const r4 =
-        hash(i.add(uint(53)));
-
-      const r5 =
-        hash(i.add(uint(71)));
-
-      const r6 =
-        hash(i.add(uint(89)));
-
-      const r7 =
-        hash(i.add(uint(107)));
-
-      // -------------------------------------------------------
-      // POSICIÓN INICIAL
-      // -------------------------------------------------------
-
-      const dir =
-        vec3(
-          r1,
-          r2,
-          r3
-        )
-          .sub(0.5)
-          .normalize();
-
-      const radius =
-        r7
-          .pow(1.0 / 3.0)
-          .mul(
-            params.baseRadius
-          );
-
-      p.assign(
-        dir.mul(radius)
+      force.addAssign(
+        radialDirection
+          .mul(params.radialStrength)
+          .div(distance.pow(2))
+          .mul(params.radialEnabled)
       );
 
-      // -------------------------------------------------------
-      // VELOCIDAD INICIAL
-      // -------------------------------------------------------
-
-      v.assign(
-        vec3(
-          r4,
-          r5,
-          r6
-        )
-          .sub(0.5)
-          .mul(
-            params.initialSpeed
-          )
+      // A/S is a direct target velocity. Level 10 is genuinely fast.
+      const targetWind = vec3(
+        params.windDirection.mul(params.windSpeed.mul(2.8)),
+        0.0,
+        0.0
       );
-    })()
-      .compute(count)
-      .setName(
-        'Initialize Particles'
+      const velocityError = targetWind.sub(v);
+      force.addAssign(
+        velocityError
+          .mul(18.0)
+          .mul(params.windEnabled)
       );
 
-  // =========================================================
-  // ACTUALIZACIÓN
-  // =========================================================
-
-  const updateParticles =
-    Fn(() => {
-      const p =
-        positionBuffer.element(
-          instanceIndex
-        );
-
-      const v =
-        velocityBuffer.element(
-          instanceIndex
-        );
-
-      const dt =
-        params.dt.mul(
-          params.timeScale
-        );
-
-      // Fuerza acumulada.
-      const force =
-        vec3(0.0).toVar();
-
-      const distFromCenter =
-        p.length();
-
-      // =======================================================
-      // 1. ESFERA
-      // =======================================================
-
-      If(
-        params.sphereBlend.greaterThan(
-          0.01
-        ),
-        () => {
-          const waveFlow =
-            vec3(
-              sin(
-                p.y
-                  .mul(2.0)
-                  .add(
-                    params.beat.mul(5.0)
-                  )
-              ),
-
-              sin(
-                p.z
-                  .mul(2.0)
-                  .add(
-                    params.beat.mul(5.0)
-                  )
-              ),
-
-              sin(
-                p.x
-                  .mul(2.0)
-                  .add(
-                    params.beat.mul(5.0)
-                  )
-              )
-            )
-              .mul(4.0);
-
-          force.addAssign(
-            waveFlow.mul(
-              params.sphereBlend
-            )
-          );
-
-          // ---------------------------------------------------
-          // GIRO
-          // ---------------------------------------------------
-
-          const rotationAxis =
-            vec3(
-              0.0,
-              1.0,
-              0.0
-            );
-
-          const tangentDir =
-            rotationAxis.cross(p);
-
-          const spinForce =
-            tangentDir
-              .mul(
-                params.spinDirection
-              )
-              .mul(
-                params.spinSpeed
-              );
-
-          force.addAssign(
-            spinForce.mul(
-              params.sphereBlend
-            )
-          );
-
-          // ---------------------------------------------------
-          // CONTENCIÓN
-          // ---------------------------------------------------
-
-          const targetRadius =
-            params.baseRadius.add(
-              params.beat.mul(
-                params.beatExpansion
-              )
-            );
-
-          const toCenterDir =
-            p.normalize();
-
-          const radiusDiff =
-            distFromCenter.sub(
-              targetRadius
-            );
-
-          const containmentForce =
-            toCenterDir
-              .negate()
-              .mul(
-                radiusDiff.mul(8.0)
-              );
-
-          force.addAssign(
-            containmentForce.mul(
-              params.sphereBlend
-            )
-          );
-
-          // ---------------------------------------------------
-          // AMORTIGUACIÓN
-          // ---------------------------------------------------
-
-          force.addAssign(
-            v
-              .mul(-0.2)
-              .mul(
-                params.sphereBlend
-              )
-          );
-        }
+      // Stop horizontal drift when speed reaches zero.
+      force.addAssign(
+        vec3(-v.x.mul(10.0), 0.0, 0.0)
+          .mul(step(0.001, params.windSpeed).oneMinus())
       );
 
-      // =======================================================
-      // 2. ARENA
-      // =======================================================
-
-      If(
-        params.sphereBlend.lessThan(
-          0.99
-        ),
-        () => {
-          const effectiveAttractor =
-            params.attractor;
-
-          const toAttractor =
-            effectiveAttractor.sub(
-              p
-            );
-
-          const distance =
-            max(
-              toAttractor.length(),
-              params.softening
-            );
-
-          const radialDirection =
-            toAttractor.div(
-              distance
-            );
-
-          // ---------------------------------------------------
-          // ATRACCIÓN / REPULSIÓN
-          // ---------------------------------------------------
-
-          const radialForce =
-            radialDirection
-              .mul(
-                params.radialStrength
-              )
-              .div(
-                distance.pow(2)
-              )
-              .mul(
-                params.radialEnabled
-              )
-              .mul(3.0);
-
-          force.addAssign(
-            radialForce.mul(
-              params.sphereBlend.oneMinus()
-            )
-          );
-
-          // ===================================================
-          // VIENTO
-          // ===================================================
-          //
-          // A/S NO generan una aceleración.
-          //
-          // Cada nivel representa directamente una velocidad.
-          //
-          // 0  = 0.0
-          // 1  = 0.4
-          // 2  = 0.8
-          // 3  = 1.2
-          // 4  = 1.6
-          // 5  = 2.0
-          // 6  = 2.4
-          // 7  = 2.8
-          // 8  = 3.2
-          // 9  = 3.6
-          // 10 = 4.0
-          //
-          // Q = izquierda
-          // W = derecha
-          //
-          // ===================================================
-
-          const windLevel =
-            params.windSpeed.clamp(
-              0.0,
-              10.0
-            );
-
-          const windMagnitude =
-            windLevel.mul(
-              1.5
-            );
-
-          const windDirection =
-            params.windDirection;
-
-          const targetWindX =
-            windDirection.mul(
-              windMagnitude
-            );
-
-          // ---------------------------------------------------
-          // TRANSICIÓN DE VELOCIDAD
-          // ---------------------------------------------------
-          //
-          // No cambiamos instantáneamente la velocidad.
-          //
-          // La velocidad se acerca rápidamente al valor
-          // seleccionado.
-          //
-          // Esto permite:
-          //
-          // 10 → 2
-          //
-          // y se nota la reducción.
-          // ---------------------------------------------------
-
-          const targetWindVelocity =
-            vec3(
-              targetWindX,
-              0.0,
-              0.0
-            );
-
-          const windDifference =
-            targetWindVelocity.sub(
-              v
-            );
-
-          const windResponse =
-            0.35;
-
-          force.addAssign(
-            windDifference
-              .mul(
-                windResponse
-              )
-              .mul(
-                params.windEnabled
-              )
-              .mul(
-                params.sphereBlend.oneMinus()
-              )
-          );
-
-          // ---------------------------------------------------
-          // VELOCIDAD 0
-          // ---------------------------------------------------
-          //
-          // Cuando A lleva el slider a 0, el viento deja de
-          // existir y la velocidad horizontal se reduce.
-          // ---------------------------------------------------
-
-          const noWind =
-            step(
-              0.001,
-              params.windSpeed
-            )
-              .oneMinus();
-
-          force.addAssign(
-            v
-              .mul(
-                vec3(
-                  -4.0,
-                  0.0,
-                  0.0
-                )
-              )
-              .mul(
-                noWind
-              )
-              .mul(
-                params.sphereBlend.oneMinus()
-              )
-          );
-
-          // ===================================================
-          // VÓRTICE
-          // ===================================================
-
-          const zAxis =
-            vec3(
-              0.0,
-              0.0,
-              1.0
-            );
-
-          const tangent =
-            zAxis.cross(
-              radialDirection
-            );
-
-          force.addAssign(
-            tangent
-              .mul(
-                params.vortexStrength
-              )
-              .mul(
-                params.vortexEnabled
-              )
-              .mul(3.0)
-              .mul(
-                params.sphereBlend.oneMinus()
-              )
-          );
-
-          // ===================================================
-          // DRAG
-          // ===================================================
-
-          force.addAssign(
-            v
-              .mul(
-                params.dragCoefficient
-              )
-              .mul(
-                params.dragEnabled
-              )
-              .mul(-1.0)
-              .mul(
-                params.sphereBlend.oneMinus()
-              )
-          );
-        }
+      const zAxis = vec3(0.0, 0.0, 1.0);
+      const tangent = zAxis.cross(radialDirection);
+      force.addAssign(
+        tangent
+          .mul(params.vortexStrength)
+          .mul(params.vortexEnabled)
       );
 
-      // =======================================================
-      // 3. KICK / SHOCKWAVE
-      // =======================================================
-
-      If(
-        params.beat.greaterThan(
-          0.01
-        ),
-        () => {
-          If(
-            params.sphereBlend.lessThan(
-              0.5
-            ),
-            () => {
-              const centerDir =
-                p.normalize();
-
-              const waveRadius =
-                params.beat.mul(
-                  25.0
-                );
-
-              const waveBand =
-                distFromCenter
-                  .sub(
-                    waveRadius
-                  )
-                  .abs();
-
-              const arenaShockwave =
-                centerDir
-                  .mul(
-                    params.beatStrength
-                  )
-                  .mul(
-                    params.beat
-                  )
-                  .mul(50.0)
-                  .div(
-                    waveBand.add(
-                      0.1
-                    )
-                  );
-
-              force.addAssign(
-                arenaShockwave.mul(
-                  params.sphereBlend.oneMinus()
-                )
-              );
-            }
-          );
-        }
+      force.addAssign(
+        v.mul(-params.dragCoefficient).mul(params.dragEnabled)
       );
-
-      // =======================================================
-      // 4. ESTÁTICA
-      // =======================================================
-
-      If(
-        params.staticTrigger.greaterThan(
-          0.01
-        ),
-        () => {
-          const randomScatter =
-            vec3(
-              hash(
-                instanceIndex.add(
-                  uint(13)
-                )
-              ),
-
-              hash(
-                instanceIndex.add(
-                  uint(23)
-                )
-              ),
-
-              hash(
-                instanceIndex.add(
-                  uint(37)
-                )
-              )
-            )
-              .sub(0.5)
-              .mul(3.0);
-
-          const staticEffect =
-            randomScatter
-              .mul(
-                params.staticStrength
-              )
-              .mul(
-                params.staticTrigger
-              );
-
-          force.addAssign(
-            staticEffect
-          );
-        }
-      );
-
-      // =======================================================
-      // 5. INTEGRACIÓN
-      // =======================================================
-
-      v.addAssign(
-        force.mul(dt)
-      );
-
-      // =======================================================
-      // 6. LÍMITE DE VELOCIDAD
-      // =======================================================
-
-      const speed =
-        v.length();
-
-      If(
-        speed.greaterThan(
-          params.maxSpeed
-        ),
-        () => {
-          v.assign(
-            v
-              .normalize()
-              .mul(
-                params.maxSpeed
-              )
-          );
-        }
-      );
-
-      // =======================================================
-      // 7. POSICIÓN
-      // =======================================================
-
-      p.addAssign(
-        v.mul(dt)
-      );
-
-      // =======================================================
-      // 8. LÍMITES DE ARENA
-      // =======================================================
-
-      const half =
-        params.boundsSize.mul(
-          0.5
-        );
-
-      const wrappedPos =
-        p
-          .add(half)
-          .mod(
-            params.boundsSize
-          )
-          .sub(half);
-
-      p.assign(
-        mix(
-          wrappedPos,
-          p,
-          params.sphereBlend
-        )
-      );
-    })()
-      .compute(count)
-      .setName(
-        'Update Particles'
-      );
-
-  // =========================================================
-  // MATERIAL
-  // =========================================================
-
-  const material =
-    new THREE.SpriteNodeMaterial({
-      blending:
-        THREE.AdditiveBlending,
-
-      depthWrite:
-        false,
-
-      transparent:
-        true
     });
 
-  material.positionNode =
-    positionBuffer.toAttribute();
+    // =======================================================
+    // ESFERA
+    // =======================================================
+    If(
+      params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)),
+      () => {
+        const targetRadius = params.baseRadius.add(params.beat.mul(params.beatExpansion));
+        const normal = p.normalize();
+        const radialError = distFromCenter.sub(targetRadius);
 
-  material.scaleNode =
-    params.particleSize;
+        force.addAssign(normal.mul(radialError.negate()).mul(9.0));
+        force.addAssign(normal.mul(sin(p.y.mul(3.0)).mul(1.8)));
+        force.addAssign(vec3(0.0, 1.0, 0.0).cross(p).mul(params.spinSpeed));
+        force.addAssign(v.mul(-0.5));
+      }
+    );
 
-  // =========================================================
-  // COLOR SEGÚN VELOCIDAD
-  // =========================================================
+    // =======================================================
+    // CÍRCULO
+    // =======================================================
+    If(
+      params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)),
+      () => {
+        const circleRadius = params.baseRadius.add(params.beat.mul(1.1));
+        const radial = vec3(p.x, p.y, 0.0);
+        const radialLength = max(radial.length(), 0.001);
+        const radialDir = radial.div(radialLength);
+        const radiusError = radialLength.sub(circleRadius);
 
-  material.colorNode =
-    Fn(() => {
-      const speed =
-        velocityBuffer
-          .toAttribute()
-          .length();
+        force.addAssign(radialDir.mul(radiusError.negate()).mul(12.0));
+        force.addAssign(vec3(0.0, 0.0, p.z.negate()).mul(5.0));
+        force.addAssign(vec3(-radialDir.y, radialDir.x, 0.0).mul(1.8));
 
-      const t =
-        speed
-          .div(
-            params.maxSpeed
-          )
-          .clamp(
-            0.0,
-            1.0
-          );
-
-      const slow =
-        color(
-          '#46a6ff'
+        // Kick produces radial spikes.
+        force.addAssign(
+          radialDir
+            .mul(params.beat)
+            .mul(sin(p.x.mul(4.0).add(p.y.mul(3.0))).abs())
+            .mul(18.0)
         );
 
-      const fast =
-        color(
-          '#ffb35a'
-        );
+        force.addAssign(v.mul(-0.7));
+      }
+    );
 
-      return vec4(
-        mix(
-          slow,
-          fast,
-          t
-        ),
-        1.0
+    // =======================================================
+    // PUNTERO
+    // =======================================================
+    If(
+      params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)),
+      () => {
+        const toPointer = params.attractor.sub(p);
+        const d = max(toPointer.length(), 0.08);
+        const dir = toPointer.div(d);
+        const orbitAxis = vec3(0.0, 0.0, 1.0);
+        const orbitDir = orbitAxis.cross(dir);
+
+        force.addAssign(dir.mul(7.0));
+        force.addAssign(orbitDir.mul(4.5));
+        force.addAssign(v.mul(-0.45));
+      }
+    );
+
+    // =======================================================
+    // LOCAS
+    // =======================================================
+    If(params.mode.greaterThan(3.5), () => {
+      const t = params.beat.mul(7.0);
+      const chaos = vec3(
+        sin(p.y.mul(4.7).add(t)),
+        cos(p.z.mul(5.3).add(t.mul(1.37))),
+        sin(p.x.mul(6.1).sub(t.mul(0.83)))
       );
-    })();
+      const noise = vec3(
+        hash(instanceIndex.add(uint(401))).sub(0.5),
+        hash(instanceIndex.add(uint(809))).sub(0.5),
+        hash(instanceIndex.add(uint(1201))).sub(0.5)
+      );
 
-  // =========================================================
-  // FORMA DE PARTÍCULA
-  // =========================================================
+      force.addAssign(chaos.mul(10.0));
+      force.addAssign(noise.mul(6.0));
+      force.addAssign(v.mul(-0.12));
+    });
 
-  material.opacityNode =
-    step(
-      uv()
-        .xy
-        .sub(0.5)
-        .length(),
+    // =======================================================
+    // KICK / ONDA
+    // =======================================================
+    If(params.beat.greaterThan(0.01), () => {
+      const centerDir = p.normalize();
+      const waveRadius = params.beat.mul(7.0);
+      const waveBand = distFromCenter.sub(waveRadius).abs();
+      const wave = centerDir
+        .mul(params.beatStrength)
+        .mul(params.beat)
+        .div(waveBand.add(0.18))
+        .mul(5.0);
+      force.addAssign(wave);
+    });
 
-      0.5
-    );
+    // =======================================================
+    // ESTÁTICA
+    // =======================================================
+    If(params.staticTrigger.greaterThan(0.01), () => {
+      const randomScatter = vec3(
+        hash(instanceIndex.add(uint(13))),
+        hash(instanceIndex.add(uint(23))),
+        hash(instanceIndex.add(uint(37)))
+      ).sub(0.5).mul(3.0);
+      force.addAssign(randomScatter.mul(params.staticStrength).mul(params.staticTrigger));
+    });
 
-  // =========================================================
-  // MESH
-  // =========================================================
+    // =======================================================
+    // CRAZY
+    // =======================================================
+    If(params.crazyEnabled.greaterThan(0.5), () => {
+      const crazy = vec3(
+        sin(p.y.mul(8.0)),
+        cos(p.z.mul(9.0)),
+        sin(p.x.mul(7.0))
+      );
+      force.addAssign(crazy.mul(14.0));
+    });
 
-  const geometry =
-    new THREE.PlaneGeometry(
-      1,
-      1
-    );
+    // =======================================================
+    // COMPRESIÓN
+    // =======================================================
+    const compressionScale = mix(1.0, 0.18, params.compression);
+    p.mulAssign(compressionScale);
 
-  const mesh =
-    new THREE.InstancedMesh(
-      geometry,
-      material,
-      count
-    );
+    // Integración.
+    v.addAssign(force.mul(dt));
 
-  mesh.frustumCulled =
-    false;
+    const speed = v.length();
+    If(speed.greaterThan(params.maxSpeed), () => {
+      v.assign(v.normalize().mul(params.maxSpeed));
+    });
 
-  scene.add(
-    mesh
+    p.addAssign(v.mul(dt));
+
+    // Arena wrapping.
+    const half = params.boundsSize.mul(0.5);
+    const wrappedPos = p.add(half).mod(params.boundsSize).sub(half);
+    p.assign(mix(wrappedPos, p, step(0.5, params.mode).mul(0.0)));
+  })().compute(count).setName('Update Particles');
+
+  const material = new THREE.SpriteNodeMaterial({
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true
+  });
+
+  material.positionNode = positionBuffer.toAttribute();
+  material.scaleNode = params.particleSize;
+
+  material.colorNode = Fn(() => {
+    const index = params.colorIndex;
+    const t = params.colorTransition;
+    const c0 = color('#ff365e');
+    const c1 = color('#ff8a32');
+    const c2 = color('#ffe14a');
+    const c3 = color('#45e06f');
+    const c4 = color('#36d9ff');
+    const c5 = color('#4f75ff');
+    const c6 = color('#9b5cff');
+    const c7 = color('#ff4fd8');
+
+    const c01 = mix(c0, c1, step(0.5, index));
+    const c12 = mix(c01, c2, step(1.5, index));
+    const c23 = mix(c12, c3, step(2.5, index));
+    const c34 = mix(c23, c4, step(3.5, index));
+    const c45 = mix(c34, c5, step(4.5, index));
+    const c56 = mix(c45, c6, step(5.5, index));
+    const c67 = mix(c56, c7, step(6.5, index));
+
+    const flashColor = mix(c67, color('#ffffff'), params.flash);
+    return vec4(mix(c67, flashColor, t), 1.0);
+  })();
+
+  material.opacityNode = step(
+    uv().xy.sub(0.5).length(),
+    0.5
   );
 
-  // =========================================================
-  // API
-  // =========================================================
+  const geometry = new THREE.PlaneGeometry(1, 1);
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
 
   function reset() {
-    renderer.compute(
-      initParticles
-    );
+    renderer.compute(initParticles);
   }
 
   function stepSimulation() {
-    renderer.compute(
-      updateParticles
-    );
+    renderer.compute(updateParticles);
   }
 
   function dispose() {
     geometry.dispose();
-
     material.dispose();
-
-    scene.remove(
-      mesh
-    );
+    scene.remove(mesh);
   }
 
   return {
     count,
-
     positionBuffer,
-
     velocityBuffer,
-
     reset,
-
     stepSimulation,
-
     dispose
   };
 }
