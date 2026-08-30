@@ -298,7 +298,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
-      // CONTENCIÓN (red de seguridad esférica, no rectangular)
+      // CONTENCIÓN (red de seguridad esférica para modos sin borde)
       // =====================================================
       const distFromCenter = max(p.length(), 0.001);
       const centerNormal = p.div(distFromCenter);
@@ -327,6 +327,20 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // POSITION
       // =====================================================
       p.addAssign(v.mul(dt));
+
+      // =====================================================
+      // ARENA WRAP (límite en caja 3D)
+      // =====================================================
+      If(params.mode.lessThan(0.5), () => {
+        const half = params.boundsSize.mul(0.5);
+
+        p.assign(
+          p
+            .add(half)
+            .mod(params.boundsSize)
+            .sub(half)
+        );
+      });
     });
   })().compute(count).setName('Update Particles');
 
