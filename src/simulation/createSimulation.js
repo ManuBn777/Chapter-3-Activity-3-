@@ -75,9 +75,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // =======================================================
     // ESTADO IDLE
     // =======================================================
-    // Mientras no haya interacción, no se aplica ninguna fuerza
-    // ni se integra movimiento: las partículas quedan quietas
-    // exactamente donde las dejó Initialize Particles.
     If(params.activated.greaterThan(0.5), () => {
 
       // =====================================================
@@ -157,7 +154,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const xy = vec3(p.x, p.y, 0.0);
         const radius = max(xy.length(), 0.001);
         const radial = xy.div(radius);
-        const tangent = vec3(-radial.y, radial.x, 0.0);
+
+        // FIX: -radial.y (operador JS) daba NaN en el shader.
+        // Los nodos TSL necesitan .negate(), no el "-" nativo de JS.
+        const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
         const radiusCorrection =
           radial
@@ -235,8 +235,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           sin(p.x.mul(8.0).add(p.y.mul(1.3)))
         );
 
+        // FIX: mismo problema, -p.y (operador JS) daba NaN.
         const swirl =
-          vec3(-p.y, p.x, sin(p.z.mul(3.0)))
+          vec3(p.y.negate(), p.x, sin(p.z.mul(3.0)))
             .mul(1.5);
 
         v.assign(
