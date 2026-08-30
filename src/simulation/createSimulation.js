@@ -31,8 +31,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       sphereDir.mul(params.baseRadius);
 
     const circle = vec3(
-      cos(angle).mul(params.baseRadius),
-      sin(angle).mul(params.baseRadius),
+      cos(angle).mul(params.circleRadius),
+      sin(angle).mul(params.circleRadius),
       0.0
     );
 
@@ -55,7 +55,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     // Estado idle: todas las partículas nacen completamente quietas.
-    // No se mueve nada hasta la primera interacción (params.activated).
     v.assign(vec3(0.0, 0.0, 0.0));
   })().compute(count).setName('Initialize Particles');
 
@@ -72,9 +71,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           .add(0.25)
       );
 
-    // =======================================================
-    // ESTADO IDLE
-    // =======================================================
     If(params.activated.greaterThan(0.5), () => {
 
       // =====================================================
@@ -87,18 +83,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           sin(p.x.mul(0.8).sub(p.y.mul(1.0))).mul(3.0)
         );
 
-        const wind = vec3(
-          params.windDirection
-            .mul(params.windSpeed)
-            .mul(2.5),
-          0.0,
-          0.0
-        );
-
         v.assign(
           mix(
             v,
-            flow.add(wind),
+            flow,
             0.18
           )
         );
@@ -154,14 +142,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const xy = vec3(p.x, p.y, 0.0);
         const radius = max(xy.length(), 0.001);
         const radial = xy.div(radius);
-
-        // FIX: -radial.y (operador JS) daba NaN en el shader.
-        // Los nodos TSL necesitan .negate(), no el "-" nativo de JS.
         const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
         const radiusCorrection =
           radial
-            .mul(params.baseRadius.sub(radius))
+            .mul(params.circleRadius.sub(radius))
             .mul(18.0);
 
         const circleVelocity =
@@ -197,6 +182,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // =====================================================
       // PUNTERO
       // =====================================================
+      // Órbita estable alrededor del puntero (no colapsa a un punto):
+      // una corrección de radio (como en la Esfera) mantiene a las
+      // partículas circulando a params.pointerOrbitRadius de distancia.
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
           params.attractor.sub(p);
@@ -207,20 +195,22 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const direction =
           toPointer.div(distance);
 
+        const radiusError =
+          distance.sub(params.pointerOrbitRadius);
+
+        const radial =
+          direction.mul(radiusError.mul(6.0));
+
         const orbit =
           vec3(0.0, 0.0, 1.0)
-            .cross(direction);
-
-        const pointerFlow =
-          direction
-            .mul(distance.mul(3.5).clamp(0.0, 10.0))
-            .add(orbit.mul(7.0));
+            .cross(direction)
+            .mul(8.0);
 
         v.assign(
           mix(
             v,
-            pointerFlow,
-            0.18
+            radial.add(orbit),
+            0.16
           )
         );
       });
@@ -235,7 +225,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           sin(p.x.mul(8.0).add(p.y.mul(1.3)))
         );
 
-        // FIX: mismo problema, -p.y (operador JS) daba NaN.
         const swirl =
           vec3(p.y.negate(), p.x, sin(p.z.mul(3.0)))
             .mul(1.5);
@@ -282,6 +271,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             .mul(dt)
         );
       });
+
+      // =====================================================
+      // VIENTO (aplica en TODOS los modos)
+      // =====================================================
+      const wind = vec3(
+        params.windDirX.mul(params.windSpeed),
+        params.windDirY.mul(params.windSpeed),
+        0.0
+      ).mul(5.0);
+
+      v.addAssign(wind.mul(dt));
 
       // =====================================================
       // COMPRESIÓN
