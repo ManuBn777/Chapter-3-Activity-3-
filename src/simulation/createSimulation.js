@@ -343,7 +343,7 @@ export function createSimulation({
               .mul(
                 params.windEnabled
               )
-              .mul(12.0)
+              .mul(30.0)
               .mul(
                 params.sphereBlend.oneMinus()
               )
