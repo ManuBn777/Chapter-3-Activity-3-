@@ -298,7 +298,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
-      // CONTENCIÓN (red de seguridad esférica para modos sin borde)
+      // CONTENCIÓN
       // =====================================================
       const distFromCenter = max(p.length(), 0.001);
       const centerNormal = p.div(distFromCenter);
@@ -329,7 +329,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       p.addAssign(v.mul(dt));
 
       // =====================================================
-      // ARENA WRAP (límite en caja 3D)
+      // ARENA WRAP
       // =====================================================
       If(params.mode.lessThan(0.5), () => {
         const half = params.boundsSize.mul(0.5);
@@ -360,9 +360,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   material.scaleNode =
     params.particleSize;
 
-  material.colorNode = Fn(() => {
-    const index = params.colorIndex;
-
+  // Paleta reutilizable: dado un índice (0-7), devuelve el color
+  // correspondiente. Se llama dos veces (color previo y color
+  // actual) para poder hacer cross-fade entre ambos.
+  const paletteColor = (index) => {
     const c0 = color('#ff365e');
     const c1 = color('#ff8a32');
     const c2 = color('#ffe14a');
@@ -380,8 +381,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const c56 = mix(c45, c6, step(5.5, index));
     const c67 = mix(c56, c7, step(6.5, index));
 
+    return c67;
+  };
+
+  material.colorNode = Fn(() => {
+    const previous = paletteColor(params.prevColorIndex);
+    const current = paletteColor(params.colorIndex);
+
+    const blended = mix(previous, current, params.colorTransition);
+
     return vec4(
-      mix(c67, color('#ffffff'), params.flash),
+      mix(blended, color('#ffffff'), params.flash),
       1.0
     );
   })();
