@@ -16,7 +16,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const angle = r1.mul(6.28318530718);
 
-    // Arena arranca como un punto pequeño y denso, no disperso.
     const smallPoint = vec3(
       r1.sub(0.5),
       r2.sub(0.5),
@@ -73,10 +72,20 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     If(params.activated.greaterThan(0.5), () => {
 
-      // Nota: Arena (mode 0) ya no tiene un bloque propio.
-      // Su único movimiento viene del viento (universal, abajo),
-      // más kick/estática/compresión — "fluye según el botón
-      // que hayas presionado", nada más.
+      // =====================================================
+      // ARENA — flujo ambiental (remolinos naturales)
+      // =====================================================
+      If(params.mode.lessThan(0.5), () => {
+        const ambientFlow = vec3(
+          sin(p.y.mul(1.2).add(p.z.mul(0.7))).mul(2.2),
+          cos(p.x.mul(1.1).add(p.z.mul(0.8))).mul(1.8),
+          sin(p.x.mul(0.8).sub(p.y.mul(1.0))).mul(2.0)
+        );
+
+        v.assign(
+          mix(v, ambientFlow, 0.12)
+        );
+      });
 
       // =====================================================
       // ESFERA
@@ -256,7 +265,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // VIENTO (universal, todos los modos, incluida Arena)
+      // VIENTO (universal, todos los modos)
       // =====================================================
       const windDir = vec3(
         cos(params.windAngle),
