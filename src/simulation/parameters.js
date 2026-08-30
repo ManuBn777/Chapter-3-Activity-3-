@@ -16,13 +16,14 @@ export function createParameters() {
 
     // ATRACTOR / PUNTERO
     attractor: uniform(new Vector3(0, 0, 0)),
+    pointerOrbitRadius: uniform(1.3),
 
     // MODOS
     // 0 Arena, 1 Esfera, 2 Círculo, 3 Puntero, 4 Locas
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
-    circleRadius: uniform(4.5),
+    circleRadius: uniform(5.5),
     beatExpansion: uniform(0.8),
 
     // FUERZA RADIAL
@@ -39,11 +40,12 @@ export function createParameters() {
     dragCoefficient: uniform(0.08),
 
     // VIENTO
-    // windDirection empieza en 1 (derecha) para que A/S solos ya
-    // muevan algo. Q pone -1 (izquierda), W pone 1 (derecha).
+    // windDirX/windDirY: -1/0/1 cada uno. Q/W mueven X, ArrowUp/ArrowDown mueven Y.
+    // windSpeed: 0 (quieto) a 10 (rápido). Se aplica en TODOS los modos.
     windEnabled: uniform(0.0),
     wind: uniform(new Vector3(0, 0, 0)),
-    windDirection: uniform(1.0),
+    windDirX: uniform(1.0),
+    windDirY: uniform(0.0),
     windSpeed: uniform(0.0),
 
     // INERCIA
