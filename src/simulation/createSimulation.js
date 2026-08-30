@@ -76,7 +76,7 @@ export function createSimulation({
         hash(i.add(uint(107)));
 
       // -------------------------------------------------------
-      // DISTRIBUCIÓN INICIAL
+      // POSICIÓN INICIAL
       // -------------------------------------------------------
 
       const dir =
@@ -141,7 +141,7 @@ export function createSimulation({
           params.timeScale
         );
 
-      // Fuerza total.
+      // Fuerza acumulada de todos los sistemas.
       const force =
         vec3(0.0).toVar();
 
@@ -253,7 +253,7 @@ export function createSimulation({
           );
 
           // ---------------------------------------------------
-          // AMORTIGUACIÓN
+          // AMORTIGUACIÓN DE ESFERA
           // ---------------------------------------------------
 
           force.addAssign(
@@ -321,107 +321,102 @@ export function createSimulation({
           // VIENTO
           // ===================================================
           //
-          // Q/W controlan EXCLUSIVAMENTE la dirección.
+          // Esta parte NO usa una aceleración acumulativa.
           //
-          // Q = -1 → izquierda
-          // W = +1 → derecha
+          // A/S:
           //
-          // A/S controlan el NIVEL de velocidad.
+          // 0  = 0.0
+          // 1  = 0.20
+          // 2  = 0.45
+          // 3  = 0.80
+          // 4  = 1.30
+          // 5  = 2.00
+          // 6  = 3.00
+          // 7  = 4.30
+          // 8  = 6.00
+          // 9  = 8.00
+          // 10 = 10.00
           //
-          // 0 = quieto
-          // 1 = muy lento
-          // ...
-          // 10 = máximo
+          // Q/W:
           //
-          // Cada nivel tiene una velocidad física propia.
+          // -1 = izquierda
+          // +1 = derecha
           //
           // ===================================================
-
-          const windSpeedTable = [
-            0.0,   // 0
-            0.25,  // 1
-            0.55,  // 2
-            0.95,  // 3
-            1.50,  // 4
-            2.20,  // 5
-            3.20,  // 6
-            4.50,  // 7
-            6.20,  // 8
-            8.00,  // 9
-            10.00  // 10
-          ];
 
           const windLevel =
             params.windSpeed
               .clamp(
                 0.0,
                 10.0
-              )
-              .round();
+              );
 
           // ---------------------------------------------------
-          // Convertimos el nivel del slider a una velocidad
-          // física real.
+          // Curva de velocidad.
+          //
+          // La fórmula es:
+          //
+          // velocidad = nivel² / 10
+          //
+          // Por tanto:
+          //
+          // 1  → 0.1
+          // 2  → 0.4
+          // 3  → 0.9
+          // 4  → 1.6
+          // 5  → 2.5
+          // 6  → 3.6
+          // 7  → 4.9
+          // 8  → 6.4
+          // 9  → 8.1
+          // 10 → 10
+          //
           // ---------------------------------------------------
 
           const windMagnitude =
-            windSpeedTable[
-              windLevel
-            ];
+            windLevel
+              .mul(
+                windLevel
+              )
+              .div(
+                10.0
+              );
 
           const windDirection =
             params.windDirection;
 
+          const targetWindX =
+            windDirection
+              .mul(
+                windMagnitude
+              );
+
           // ---------------------------------------------------
-          // Velocidad objetivo del viento.
+          // VELOCIDAD OBJETIVO
           //
-          // Ejemplo:
-          //
-          // Q + nivel 5
-          // → -2.2
-          //
-          // W + nivel 5
-          // → +2.2
-          //
+          // En lugar de sumar una fuerza enorme cada frame,
+          // hacemos que la velocidad X se acerque a la
+          // velocidad correspondiente al nivel seleccionado.
           // ---------------------------------------------------
 
           const targetWindVelocity =
             vec3(
-              windDirection
-                .mul(
-                  windMagnitude
-                ),
-
+              targetWindX,
               0.0,
-
               0.0
             );
 
-          // ---------------------------------------------------
-          // VIENTO
-          // ---------------------------------------------------
-          //
-          // En lugar de acumular una aceleración indefinidamente,
-          // hacemos que la velocidad horizontal de las partículas
-          // se acerque suavemente a la velocidad del viento.
-          //
-          // Esto hace que:
-          //
-          // 10 → 2
-          //
-          // realmente reduzca la velocidad.
-          // ---------------------------------------------------
-
-          const windResponse =
-            0.12;
-
-          const windVelocityDifference =
+          const windDifference =
             targetWindVelocity.sub(
               v
             );
 
+          // Qué tan rápido responde la partícula al cambio.
+          const windResponse =
+            0.20;
+
           const windAdjustment =
-            windVelocityDifference
+            windDifference
               .mul(
                 windResponse
               )
@@ -430,24 +425,30 @@ export function createSimulation({
               );
 
           force.addAssign(
-            windAdjustment
-              .mul(
-                params.sphereBlend.oneMinus()
-              )
+            windAdjustment.mul(
+              params.sphereBlend.oneMinus()
+            )
           );
 
           // ===================================================
-          // FRENADO CUANDO EL VIENTO ESTÁ EN 0
+          // SI WIND SPEED = 0
           // ===================================================
           //
-          // Cuando A lleva el slider hasta 0:
+          // El objetivo es:
           //
-          // 1. El viento deja de tener velocidad.
-          // 2. La velocidad restante desaparece suavemente.
+          // 10 → 2
+          //
+          // que baje progresivamente.
+          //
+          // Y:
+          //
+          // 2 → 0
+          //
+          // que termine completamente quieto.
           //
           // ===================================================
 
-          const windStopped =
+          const windIsZero =
             step(
               0.001,
               params.windSpeed
@@ -456,9 +457,9 @@ export function createSimulation({
 
           force.addAssign(
             v
-              .mul(-2.5)
+              .mul(-3.0)
               .mul(
-                windStopped
+                windIsZero
               )
               .mul(
                 params.sphereBlend.oneMinus()
