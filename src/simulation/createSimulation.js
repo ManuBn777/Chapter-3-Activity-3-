@@ -261,7 +261,7 @@ export function createSimulation({
         force.addAssign(
           params.wind
             .mul(params.windEnabled)
-            .mul(3.0)
+            .mul(12.0)
             .mul(params.sphereBlend.oneMinus())
         );
 
