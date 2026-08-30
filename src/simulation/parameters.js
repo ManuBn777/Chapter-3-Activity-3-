@@ -65,7 +65,7 @@ export function createParameters() {
 
     // Q = -1 → izquierda
     // W = +1 → derecha
-    windDirection: uniform(1.0),
+    windDirection: uniform(0.0),
 
     // A/S cambian esta cantidad de 1 en 1.
     windSpeed: uniform(0.0),
