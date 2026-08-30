@@ -8,6 +8,10 @@ export function createParameters() {
     timeScale: uniform(1.0),
     maxSpeed: uniform(30.0),
 
+    // ESTADO
+    // 0 = idle (nada se mueve todavía), 1 = activado tras la primera interacción
+    activated: uniform(0.0),
+
     // APARIENCIA
     particleSize: uniform(0.025),
 
