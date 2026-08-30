@@ -96,6 +96,7 @@ async function main() {
   let uiMode = 'LAB';
   let compressionHeld = false;
   let windSpeedTarget = 0;
+  let slowMotionTarget = 0;
   let hasSpread = false;
 
   const heldKeys = new Set();
@@ -173,6 +174,9 @@ async function main() {
     performanceGuide.visible = !lab && params.mode.value === 3;
   };
 
+  // Cambiar de modo YA NO resetea posiciones: cada modo tiene su
+  // propia fuerza de atracción hacia su forma, así que las partículas
+  // fluyen suavemente desde donde estén hacia la nueva forma.
   const setParticleMode = (next) => {
     params.mode.value = next;
     params.sphereBlend.value = next === 1 ? 1.0 : 0.0;
@@ -181,8 +185,6 @@ async function main() {
 
     attractorHelper.visible = uiMode === 'LAB' && next === 3;
     performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
-
-    simulation.reset();
   };
 
   const triggerBeat = () => {
@@ -194,7 +196,7 @@ async function main() {
   };
 
   const toggleSlow = () => {
-    params.slowMotion.value = params.slowMotion.value > 0.5 ? 0.0 : 1.0;
+    slowMotionTarget = slowMotionTarget > 0.5 ? 0 : 1;
   };
 
   const cycleColor = () => {
@@ -202,10 +204,6 @@ async function main() {
     params.colorIndex.value = (params.colorIndex.value + 1) % 8;
     params.colorTransition.value = 0.0;
   };
-
-  // =========================================================
-  // VIENTO
-  // =========================================================
 
   const changeWindSpeed = (amount) => {
     activate();
@@ -228,7 +226,6 @@ async function main() {
     params.windAngle.value = value;
   };
 
-  // Saltos instantáneos de dirección, además de la rotación continua Q/W.
   const rotateWindBy = (radians) => {
     activate();
     params.windAngle.value += radians;
@@ -242,12 +239,14 @@ async function main() {
     params.windSpeed.value = 0.0;
     params.windAngle.value = 0.0;
 
+    slowMotionTarget = 0;
+    params.slowMotion.value = 0.0;
+
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
     params.crazyEnabled.value = 0.0;
     params.compression.value = 0.0;
     params.flash.value = 0.0;
-    params.slowMotion.value = 0.0;
     params.beat.value = 0.0;
     params.staticTrigger.value = 0.0;
 
@@ -260,6 +259,7 @@ async function main() {
     hasSpread = false;
 
     setParticleMode(0);
+    simulation.reset();
   };
 
   const panel = createLabPanel({
@@ -386,9 +386,6 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
-    // Suaviza windSpeed hacia el objetivo, pero con "snap" cuando ya
-    // está muy cerca — así llegar a 0 (o a cualquier valor) es un
-    // freno real, no una aproximación infinita que nunca se detiene.
     const windDiff = windSpeedTarget - params.windSpeed.value;
 
     if (Math.abs(windDiff) < 0.02) {
@@ -397,9 +394,17 @@ async function main() {
       params.windSpeed.value += windDiff * Math.min(1, delta * 4);
     }
 
-    // Cross-fade de color más lento y fluido (~0.4s).
-    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 2.5);
+    // Rampa suave de entrada/salida a slow motion (~0.3-0.4s), usando
+    // delta en tiempo real (no afectada por el propio slow motion).
+    const slowDiff = slowMotionTarget - params.slowMotion.value;
 
+    if (Math.abs(slowDiff) < 0.01) {
+      params.slowMotion.value = slowMotionTarget;
+    } else {
+      params.slowMotion.value += slowDiff * Math.min(1, delta * 6);
+    }
+
+    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 2.5);
     params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
     params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
