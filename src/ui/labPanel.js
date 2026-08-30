@@ -83,11 +83,22 @@ export function createLabPanel({
   button(effects, 'Slow motion (T)', onSlow);
   button(effects, 'Estática (N)', onStatic);
 
-  const wind = section(panel, 'Viento · A/S + Q/W');
+  const wind = section(panel, 'Viento · A/S + Q/W + ↑/↓');
   rangeRow(wind, 'Velocidad A/S', () => params.windSpeed.value, 0, 10, 1, onWindSpeed);
-  rangeRow(wind, 'Dirección Q/W', () => params.windDirection.value, -1, 1, 1, onWindDirection);
-  rangeRow(wind, 'wind.x', () => params.wind.value.x, -10, 10, 0.1, (v) => { params.wind.value.x = v; });
-  rangeRow(wind, 'wind.y', () => params.wind.value.y, -4, 4, 0.1, (v) => { params.wind.value.y = v; });
+  rangeRow(
+    wind,
+    'Dirección X (Q/W)',
+    () => params.windDirX.value,
+    -1, 1, 1,
+    (v) => onWindDirection(v, params.windDirY.value)
+  );
+  rangeRow(
+    wind,
+    'Dirección Y (↑/↓)',
+    () => params.windDirY.value,
+    -1, 1, 1,
+    (v) => onWindDirection(params.windDirX.value, v)
+  );
 
   const sim = section(panel, 'Simulación');
   rangeRow(sim, 'timeScale', () => params.timeScale.value, 0, 2, 0.01, (v) => { params.timeScale.value = v; });
