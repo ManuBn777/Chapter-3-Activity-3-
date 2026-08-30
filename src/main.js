@@ -10,6 +10,7 @@ const PARTICLE_COUNT = 131072;
 const WIND_ROTATE_SPEED = 2.4;
 const WIND_SPEED_MIN = 0;
 const WIND_SPEED_MAX = 25;
+const RIPPLE_DURATION = 1.1;
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -135,16 +136,36 @@ async function main() {
     event.preventDefault();
   });
 
-  addEventListener('pointerdown', (event) => {
-    if (params.mode.value !== 0) {
-      activate();
-    }
+  // =========================================================
+  // ONDAS (click izquierdo) — pool de 4 slots
+  // =========================================================
 
+  const ripples = [
+    { pos: params.ripple0Pos, life: params.ripple0Life },
+    { pos: params.ripple1Pos, life: params.ripple1Life },
+    { pos: params.ripple2Pos, life: params.ripple2Life },
+    { pos: params.ripple3Pos, life: params.ripple3Life }
+  ];
+
+  let nextRippleSlot = 0;
+
+  const triggerRipple = () => {
+    activate();
+
+    const slot = ripples[nextRippleSlot];
+    slot.pos.value.copy(params.attractor.value);
+    slot.life.value = 1.0;
+
+    nextRippleSlot = (nextRippleSlot + 1) % ripples.length;
+  };
+
+  addEventListener('pointerdown', (event) => {
     if (event.button === 0) {
-      params.beat.value = 1.0;
+      triggerRipple();
     }
 
     if (event.button === 2) {
+      activate();
       compressionHeld = true;
       params.compression.value = 1.0;
     }
@@ -152,14 +173,14 @@ async function main() {
 
   addEventListener('pointerup', (event) => {
     if (event.button === 2) {
+      // No forzamos compression a 0 aquí: dejamos que la rampa del
+      // loop de render la devuelva suave a su estado original.
       compressionHeld = false;
-      params.compression.value = 0.0;
     }
   });
 
   addEventListener('pointercancel', () => {
     compressionHeld = false;
-    params.compression.value = 0.0;
   });
 
   const setUiMode = (next) => {
@@ -174,9 +195,6 @@ async function main() {
     performanceGuide.visible = !lab && params.mode.value === 3;
   };
 
-  // Cambiar de modo YA NO resetea posiciones: cada modo tiene su
-  // propia fuerza de atracción hacia su forma, así que las partículas
-  // fluyen suavemente desde donde estén hacia la nueva forma.
   const setParticleMode = (next) => {
     params.mode.value = next;
     params.sphereBlend.value = next === 1 ? 1.0 : 0.0;
@@ -193,6 +211,10 @@ async function main() {
 
   const triggerStatic = () => {
     params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
+  };
+
+  const triggerCrazy = () => {
+    params.crazyTrigger.value = Math.min(2.0, params.crazyTrigger.value + 1.0);
   };
 
   const toggleSlow = () => {
@@ -245,10 +267,16 @@ async function main() {
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
     params.crazyEnabled.value = 0.0;
+    params.crazyTrigger.value = 0.0;
     params.compression.value = 0.0;
     params.flash.value = 0.0;
     params.beat.value = 0.0;
     params.staticTrigger.value = 0.0;
+
+    ripples.forEach((r) => {
+      r.life.value = 0.0;
+    });
+    nextRippleSlot = 0;
 
     params.colorIndex.value = 0.0;
     params.prevColorIndex.value = 0.0;
@@ -267,10 +295,12 @@ async function main() {
     onReset: reset,
     onModeSelect: setParticleMode,
     onBeat: triggerBeat,
+    onRipple: triggerRipple,
     onFlash: triggerFlash,
     onColor: cycleColor,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
+    onCrazy: triggerCrazy,
     onWindSpeed: setWindSpeed,
     onWindAngle: setWindAngle,
     onWindFlip180: () => rotateWindBy(Math.PI),
@@ -309,6 +339,10 @@ async function main() {
         triggerStatic();
         break;
 
+      case 'KeyL':
+        triggerCrazy();
+        break;
+
       case 'KeyC':
         cycleColor();
         break;
@@ -335,6 +369,10 @@ async function main() {
 
       case 'Digit4':
         setParticleMode(3);
+        break;
+
+      case 'Digit5':
+        setParticleMode(4);
         break;
 
       case 'KeyA':
@@ -394,8 +432,6 @@ async function main() {
       params.windSpeed.value += windDiff * Math.min(1, delta * 4);
     }
 
-    // Rampa suave de entrada/salida a slow motion (~0.3-0.4s), usando
-    // delta en tiempo real (no afectada por el propio slow motion).
     const slowDiff = slowMotionTarget - params.slowMotion.value;
 
     if (Math.abs(slowDiff) < 0.01) {
@@ -404,9 +440,17 @@ async function main() {
       params.slowMotion.value += slowDiff * Math.min(1, delta * 6);
     }
 
+    // Ondas: decaen con el tiempo (vida 1 -> 0 en RIPPLE_DURATION seg).
+    ripples.forEach((r) => {
+      if (r.life.value > 0) {
+        r.life.value = Math.max(0, r.life.value - delta / RIPPLE_DURATION);
+      }
+    });
+
     params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 2.5);
     params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
+    params.crazyTrigger.value = Math.max(0, params.crazyTrigger.value - delta * 1.2);
     params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
 
     if (!compressionHeld) {
@@ -429,4 +473,5 @@ async function main() {
   });
 }
 
+main().catch(console.error);
 main().catch(console.error);
