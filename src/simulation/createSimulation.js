@@ -350,7 +350,7 @@ export function createSimulation({
 
           const windMagnitude =
             windLevel.mul(
-              0.4
+              1.5
             );
 
           const windDirection =
