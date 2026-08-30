@@ -7,6 +7,7 @@ import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 131072;
+const WIND_ROTATE_SPEED = 2.4; // rad/s mientras Q o W están presionadas
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -92,6 +93,9 @@ async function main() {
   let paused = false;
   let uiMode = 'LAB';
   let compressionHeld = false;
+  let windSpeedTarget = 0;
+
+  const heldKeys = new Set();
 
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
@@ -123,7 +127,11 @@ async function main() {
   });
 
   addEventListener('pointerdown', (event) => {
-    activate();
+    // En Arena, el click NO activa el flujo — solo el viento (A/S/Q/W) lo hace.
+    // En los demás modos, el click sí cuenta como interacción.
+    if (params.mode.value !== 0) {
+      activate();
+    }
 
     if (event.button === 0) {
       params.beat.value = 1.0;
@@ -172,12 +180,10 @@ async function main() {
   };
 
   const triggerBeat = () => {
-    activate();
     params.beat.value = 1.0;
   };
 
   const triggerStatic = () => {
-    activate();
     params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
   };
 
@@ -193,36 +199,29 @@ async function main() {
   // =========================================================
   // VIENTO
   // =========================================================
-  // windDirX/windDirY: -1/0/1. windSpeed: 0..10 (magnitud, comparte
-  // eje X e Y). Q/W mueven en X. ArrowUp/ArrowDown mueven en Y.
 
   const changeWindSpeed = (amount) => {
     activate();
-
-    params.windSpeed.value = Math.max(
-      0,
-      Math.min(10, params.windSpeed.value + amount)
-    );
+    windSpeedTarget = Math.max(0, Math.min(10, windSpeedTarget + amount));
   };
 
   const setWindSpeed = (value) => {
     activate();
-    params.windSpeed.value = Math.max(0, Math.min(10, value));
+    windSpeedTarget = Math.max(0, Math.min(10, value));
   };
 
-  const setWindDirection = (dx, dy) => {
+  const setWindAngle = (value) => {
     activate();
-    params.windDirX.value = dx;
-    params.windDirY.value = dy;
+    params.windAngle.value = value;
   };
 
   const reset = () => {
     params.timeScale.value = 1.0;
     params.maxSpeed.value = 30.0;
 
+    windSpeedTarget = 0;
     params.windSpeed.value = 0.0;
-    params.windDirX.value = 1.0;
-    params.windDirY.value = 0.0;
+    params.windAngle.value = 0.0;
 
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
@@ -252,7 +251,7 @@ async function main() {
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onWindSpeed: setWindSpeed,
-    onWindDirection: setWindDirection,
+    onWindAngle: setWindAngle,
     onModeChange: () => {
       setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     },
@@ -265,6 +264,8 @@ async function main() {
   setParticleMode(0);
 
   addEventListener('keydown', (event) => {
+    heldKeys.add(event.code);
+
     if (event.repeat) return;
 
     switch (event.code) {
@@ -312,22 +313,6 @@ async function main() {
         setParticleMode(3);
         break;
 
-      case 'KeyQ':
-        setWindDirection(-1, 0);
-        break;
-
-      case 'KeyW':
-        setWindDirection(1, 0);
-        break;
-
-      case 'ArrowUp':
-        setWindDirection(0, 1);
-        break;
-
-      case 'ArrowDown':
-        setWindDirection(0, -1);
-        break;
-
       case 'KeyA':
         changeWindSpeed(-1);
         break;
@@ -336,6 +321,10 @@ async function main() {
         changeWindSpeed(1);
         break;
     }
+  });
+
+  addEventListener('keyup', (event) => {
+    heldKeys.delete(event.code);
   });
 
   addEventListener('resize', () => {
@@ -350,6 +339,21 @@ async function main() {
 
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
+
+    // Rotación continua del viento mientras Q/W están presionadas.
+    if (heldKeys.has('KeyQ')) {
+      activate();
+      params.windAngle.value -= WIND_ROTATE_SPEED * delta;
+    }
+
+    if (heldKeys.has('KeyW')) {
+      activate();
+      params.windAngle.value += WIND_ROTATE_SPEED * delta;
+    }
+
+    // Suaviza windSpeed hacia el objetivo (arranque/frenado gradual).
+    params.windSpeed.value +=
+      (windSpeedTarget - params.windSpeed.value) * Math.min(1, delta * 4);
 
     params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 5);
     params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
