@@ -72,8 +72,7 @@ export function createLabPanel({
     [0, '1 · Arena'],
     [1, '2 · Esfera'],
     [2, '3 · Círculo'],
-    [3, '4 · Puntero'],
-    [4, '5 · Locas']
+    [3, '4 · Puntero']
   ].forEach(([id, label]) => button(modes, label, () => onModeSelect(id)));
 
   const effects = section(panel, 'Efectos');
