@@ -19,7 +19,6 @@ export function createParameters() {
     pointerOrbitRadius: uniform(1.3),
 
     // MODOS
-    // 0 Arena, 1 Esfera, 2 Círculo, 3 Puntero, 4 Locas
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
@@ -40,10 +39,6 @@ export function createParameters() {
     dragCoefficient: uniform(0.08),
 
     // VIENTO
-    // windAngle: ángulo continuo en radianes. Q resta, W suma
-    // (mantenidas presionadas = rotación continua).
-    // windSpeed: 0..10, se suaviza en JS hacia un objetivo (A/S)
-    // para que arrancar/detenerse sea gradual, no un salto.
     windAngle: uniform(0.0),
     windSpeed: uniform(0.0),
 
@@ -58,10 +53,12 @@ export function createParameters() {
     staticTrigger: uniform(0.0),
     staticStrength: uniform(3.0),
 
+    // ARENA — límite en caja 3D (vuelve, como pediste)
+    boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
+
     // CONTENCIÓN
-    // Red de seguridad esférica (no rectangular): solo actúa muy
-    // lejos del centro, para que Arena no tenga límites en forma
-    // de caja pero tampoco pierda partículas al infinito.
+    // Red esférica de seguridad para los demás modos (Locas, etc.),
+    // que no tienen un borde propio.
     containmentRadius: uniform(14.0),
 
     // COMPATIBILIDAD
