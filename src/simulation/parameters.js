@@ -9,7 +9,7 @@ export function createParameters() {
 
     dt: uniform(1.0 / 60.0),
     timeScale: uniform(1.0),
-    maxSpeed: uniform(4.0),
+    maxSpeed: uniform(12.0),
 
     // =========================================================
     // APARIENCIA
