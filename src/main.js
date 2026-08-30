@@ -123,6 +123,12 @@ async function main() {
   );
   const hit = new THREE.Vector3();
 
+  // Saca el sistema del estado idle en la primera interacción real.
+  // Antes de esto, positions/velocities quedan congeladas en el GPU.
+  const activate = () => {
+    params.activated.value = 1;
+  };
+
   // =========================================================
   // PUNTERO
   // =========================================================
@@ -161,6 +167,8 @@ async function main() {
   // =========================================================
 
   addEventListener('pointerdown', (event) => {
+    activate();
+
     // Click izquierdo = onda / kick.
     // OrbitControls tiene rotate desactivado, por lo que esto
     // ya no mueve la cámara.
@@ -190,6 +198,9 @@ async function main() {
   // =========================================================
   // MODOS
   // =========================================================
+  // Mapa final: Arena, Esfera, Círculo, Puntero (4 modos).
+  // "Locas" deja de ser un modo seleccionable — vuelve más
+  // adelante como efecto (tecla N).
 
   const setUiMode = (next) => {
     uiMode = next;
@@ -224,9 +235,6 @@ async function main() {
     params.vortexEnabled.value =
       next === 3 ? 1.0 : 0.0;
 
-    params.crazyEnabled.value =
-      next === 4 ? 1.0 : 0.0;
-
     attractorHelper.visible =
       uiMode === 'LAB' && next === 3;
 
@@ -242,10 +250,12 @@ async function main() {
   // =========================================================
 
   const triggerBeat = () => {
+    activate();
     params.beat.value = 1.0;
   };
 
   const triggerStatic = () => {
+    activate();
     params.staticTrigger.value = Math.min(
       2.0,
       params.staticTrigger.value + 1.0
@@ -297,6 +307,8 @@ async function main() {
 
   // Teclado: cambia de 1 en 1.
   const changeWindSpeed = (amount) => {
+    activate();
+
     params.windSpeed.value = Math.max(
       0,
       Math.min(
@@ -310,6 +322,8 @@ async function main() {
 
   // Slider: establece el valor directamente.
   const setWindSpeed = (value) => {
+    activate();
+
     params.windSpeed.value = Math.max(
       0,
       Math.min(10, value)
@@ -320,6 +334,8 @@ async function main() {
 
   // Q/W siempre establecen la dirección completa.
   const changeWindDirection = (direction) => {
+    activate();
+
     params.windDirection.value =
       direction;
 
@@ -327,6 +343,8 @@ async function main() {
   };
 
   const setWindDirection = (direction) => {
+    activate();
+
     params.windDirection.value =
       direction;
 
@@ -359,6 +377,9 @@ async function main() {
     params.colorTransition.value = 1.0;
 
     flashAmount = 0;
+
+    // Reset vuelve al sistema al estado idle inicial.
+    params.activated.value = 0;
 
     setParticleMode(0);
   };
@@ -396,6 +417,7 @@ async function main() {
   // =========================================================
   // TECLADO
   // =========================================================
+  // Solo 4 modos (Digit1–Digit4). Digit5/KeyE quedan libres.
 
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
@@ -447,10 +469,6 @@ async function main() {
 
       case 'Digit4':
         setParticleMode(3);
-        break;
-
-      case 'Digit5':
-        setParticleMode(4);
         break;
 
       case 'KeyQ':
