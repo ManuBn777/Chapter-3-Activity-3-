@@ -9,7 +9,6 @@ export function createParameters() {
     maxSpeed: uniform(30.0),
 
     // ESTADO
-    // 0 = idle (nada se mueve todavía), 1 = activado tras la primera interacción
     activated: uniform(0.0),
 
     // APARIENCIA
@@ -23,6 +22,7 @@ export function createParameters() {
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
+    circleRadius: uniform(4.5),
     beatExpansion: uniform(0.8),
 
     // FUERZA RADIAL
@@ -39,9 +39,11 @@ export function createParameters() {
     dragCoefficient: uniform(0.08),
 
     // VIENTO
+    // windDirection empieza en 1 (derecha) para que A/S solos ya
+    // muevan algo. Q pone -1 (izquierda), W pone 1 (derecha).
     windEnabled: uniform(0.0),
     wind: uniform(new Vector3(0, 0, 0)),
-    windDirection: uniform(0.0),
+    windDirection: uniform(1.0),
     windSpeed: uniform(0.0),
 
     // INERCIA
