@@ -14,8 +14,7 @@ import {
   uv,
   vec3,
   vec4,
-  sin,
-  cos
+  sin
 } from 'three/tsl';
 
 export function createSimulation({
@@ -103,14 +102,6 @@ export function createSimulation({
       // -------------------------------------------------------
       // VELOCIDAD INICIAL
       // -------------------------------------------------------
-      //
-      // Al entrar:
-      //
-      // initialSpeed = 0
-      //
-      // Por lo tanto las partículas empiezan completamente
-      // quietas.
-      // -------------------------------------------------------
 
       v.assign(
         vec3(
@@ -130,7 +121,7 @@ export function createSimulation({
       );
 
   // =========================================================
-  // ACTUALIZACIÓN DE PARTÍCULAS
+  // ACTUALIZACIÓN
   // =========================================================
 
   const updateParticles =
@@ -262,7 +253,7 @@ export function createSimulation({
           );
 
           // ---------------------------------------------------
-          // Amortiguación de esfera
+          // Amortiguación
           // ---------------------------------------------------
 
           force.addAssign(
@@ -304,7 +295,7 @@ export function createSimulation({
             );
 
           // ---------------------------------------------------
-          // Atracción / repulsión
+          // ATRACCIÓN / REPULSIÓN
           // ---------------------------------------------------
 
           const radialForce =
@@ -326,44 +317,84 @@ export function createSimulation({
             )
           );
 
-          // ---------------------------------------------------
+          // ===================================================
           // VIENTO
-          // ---------------------------------------------------
+          // ===================================================
           //
-          // params.wind ya contiene:
+          // IMPORTANTE:
           //
-          // dirección × velocidad
+          // windDirection:
           //
-          // Q/W = dirección
-          // A/S = velocidad
-          // ---------------------------------------------------
+          // -1 = izquierda
+          //  0 = neutro
+          // +1 = derecha
+          //
+          // windSpeed:
+          //
+          // 0 = sin velocidad
+          // 10 = máxima velocidad
+          //
+          // La intensidad es cuadrática:
+          //
+          // 1  → 1%
+          // 2  → 4%
+          // 3  → 9%
+          // 4  → 16%
+          // 5  → 25%
+          // 6  → 36%
+          // 7  → 49%
+          // 8  → 64%
+          // 9  → 81%
+          // 10 → 100%
+          //
+          // ===================================================
+
+          const normalizedWindSpeed =
+            params.windSpeed
+              .div(10.0);
+
+          const windIntensity =
+            normalizedWindSpeed
+              .mul(
+                normalizedWindSpeed
+              );
+
+          const windDirection =
+            params.windDirection;
+
+          const windForce =
+            vec3(
+              windDirection,
+              0.0,
+              0.0
+            )
+              .mul(
+                windIntensity
+              )
+              .mul(30.0);
 
           force.addAssign(
-            params.wind
+            windForce
               .mul(
                 params.windEnabled
               )
-              .mul(30.0)
               .mul(
                 params.sphereBlend.oneMinus()
               )
           );
 
-          // ---------------------------------------------------
-          // FRENADO SUAVE DEL VIENTO
-          // ---------------------------------------------------
+          // ===================================================
+          // FRENADO CUANDO EL VIENTO LLEGA A 0
+          // ===================================================
           //
-          // Cuando windSpeed llega a 0, el viento deja de
-          // acelerar las partículas.
+          // Si windSpeed = 0:
           //
-          // Pero las partículas ya poseen velocidad.
+          // las partículas pierden progresivamente la velocidad
+          // que habían adquirido.
           //
-          // Este drag hace que esa velocidad desaparezca
-          // progresivamente en vez de detenerse de golpe.
+          // No es un frenazo instantáneo.
           //
-          // Importante:
-          // solo actúa cuando el viento está en 0.
-          // ---------------------------------------------------
+          // ===================================================
 
           const windStopped =
             step(
@@ -383,9 +414,9 @@ export function createSimulation({
               )
           );
 
-          // ---------------------------------------------------
+          // ===================================================
           // VÓRTICE
-          // ---------------------------------------------------
+          // ===================================================
 
           const zAxis =
             vec3(
@@ -413,9 +444,9 @@ export function createSimulation({
               )
           );
 
-          // ---------------------------------------------------
+          // ===================================================
           // DRAG GENERAL
-          // ---------------------------------------------------
+          // ===================================================
 
           force.addAssign(
             v
@@ -457,7 +488,9 @@ export function createSimulation({
 
               const waveBand =
                 distFromCenter
-                  .sub(waveRadius)
+                  .sub(
+                    waveRadius
+                  )
                   .abs();
 
               const arenaShockwave =
@@ -470,7 +503,9 @@ export function createSimulation({
                   )
                   .mul(50.0)
                   .div(
-                    waveBand.add(0.1)
+                    waveBand.add(
+                      0.1
+                    )
                   );
 
               force.addAssign(
