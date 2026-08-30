@@ -7,7 +7,7 @@ import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 131072;
-const WIND_ROTATE_SPEED = 2.4; // rad/s mientras Q o W están presionadas
+const WIND_ROTATE_SPEED = 2.4;
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -94,6 +94,7 @@ async function main() {
   let uiMode = 'LAB';
   let compressionHeld = false;
   let windSpeedTarget = 0;
+  let hasSpread = false;
 
   const heldKeys = new Set();
 
@@ -106,6 +107,13 @@ async function main() {
   const hit = new THREE.Vector3();
 
   const activate = () => {
+    if (!hasSpread) {
+      hasSpread = true;
+      // Empujón inicial: separa las partículas del punto compacto
+      // en el que nacen, la primera vez que se sale del idle.
+      params.staticTrigger.value = 2.5;
+    }
+
     params.activated.value = 1;
   };
 
@@ -127,8 +135,6 @@ async function main() {
   });
 
   addEventListener('pointerdown', (event) => {
-    // En Arena, el click NO activa el flujo — solo el viento (A/S/Q/W) lo hace.
-    // En los demás modos, el click sí cuenta como interacción.
     if (params.mode.value !== 0) {
       activate();
     }
@@ -196,10 +202,6 @@ async function main() {
     params.colorTransition.value = 0.0;
   };
 
-  // =========================================================
-  // VIENTO
-  // =========================================================
-
   const changeWindSpeed = (amount) => {
     activate();
     windSpeedTarget = Math.max(0, Math.min(10, windSpeedTarget + amount));
@@ -237,6 +239,7 @@ async function main() {
 
     flashAmount = 0;
     params.activated.value = 0;
+    hasSpread = false;
 
     setParticleMode(0);
   };
@@ -340,7 +343,6 @@ async function main() {
   renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
 
-    // Rotación continua del viento mientras Q/W están presionadas.
     if (heldKeys.has('KeyQ')) {
       activate();
       params.windAngle.value -= WIND_ROTATE_SPEED * delta;
@@ -351,7 +353,6 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
-    // Suaviza windSpeed hacia el objetivo (arranque/frenado gradual).
     params.windSpeed.value +=
       (windSpeedTarget - params.windSpeed.value) * Math.min(1, delta * 4);
 
