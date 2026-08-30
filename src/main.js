@@ -252,7 +252,7 @@ async function main() {
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onWindSpeed: setWindSpeed,
-    onWindDirection: (v) => setWindDirection(v, 0),
+    onWindDirection: setWindDirection,
     onModeChange: () => {
       setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     },
