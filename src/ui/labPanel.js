@@ -51,10 +51,12 @@ export function createLabPanel({
   onReset,
   onModeSelect,
   onBeat,
+  onRipple,
   onFlash,
   onColor,
   onSlow,
   onStatic,
+  onCrazy,
   onWindSpeed,
   onWindAngle,
   onWindFlip180,
@@ -75,16 +77,18 @@ export function createLabPanel({
     [0, '1 · Arena'],
     [1, '2 · Esfera'],
     [2, '3 · Círculo'],
-    [3, '4 · Puntero']
+    [3, '4 · Puntero'],
+    [4, '5 · Neutro']
   ].forEach(([id, label]) => button(modes, label, () => onModeSelect(id)));
 
   const effects = section(panel, 'Efectos');
   button(effects, 'Kick / Bounce (B)', onBeat);
-  button(effects, 'Onda / Click izquierdo', onBeat);
+  button(effects, 'Onda / Click izquierdo', onRipple);
   button(effects, 'Color (C)', onColor);
   button(effects, 'Flash (F)', onFlash);
   button(effects, 'Slow motion (T)', onSlow);
   button(effects, 'Estática (N)', onStatic);
+  button(effects, 'Locura (L)', onCrazy);
 
   const wind = section(panel, 'Viento · A/S vel. + Q/W rotación');
   rangeRow(wind, 'Velocidad A/S (0-25)', () => params.windSpeed.value, 0, 25, 1, onWindSpeed);
