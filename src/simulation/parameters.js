@@ -53,12 +53,10 @@ export function createParameters() {
     staticTrigger: uniform(0.0),
     staticStrength: uniform(3.0),
 
-    // ARENA — límite en caja 3D (vuelve, como pediste)
+    // ARENA
     boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
 
     // CONTENCIÓN
-    // Red esférica de seguridad para los demás modos (Locas, etc.),
-    // que no tienen un borde propio.
     containmentRadius: uniform(14.0),
 
     // COMPATIBILIDAD
@@ -72,7 +70,10 @@ export function createParameters() {
     slowMotion: uniform(0.0),
 
     // COLOR
+    // prevColorIndex guarda el color del que venimos, para poder
+    // hacer un cross-fade real hacia colorIndex en vez de un salto.
     colorIndex: uniform(0.0),
+    prevColorIndex: uniform(0.0),
     colorTransition: uniform(1.0)
   };
 }
