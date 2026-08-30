@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
-
 import './styles.css';
 
 import { createParameters } from './simulation/parameters.js';
@@ -11,877 +10,241 @@ import { createLabPanel } from './ui/labPanel.js';
 const PARTICLE_COUNT = 131072;
 
 async function main() {
-  const mount =
-    document.querySelector('#app');
-
-  // =========================================================
-  // WEBGPU
-  // =========================================================
+  const mount = document.querySelector('#app');
 
   if (!WebGPU.isAvailable()) {
-    mount.appendChild(
-      WebGPU.getErrorMessage()
-    );
-
-    throw new Error(
-      'Este proyecto requiere WebGPU para ejecutar compute shaders.'
-    );
+    mount.appendChild(WebGPU.getErrorMessage());
+    throw new Error('Este proyecto requiere WebGPU para ejecutar compute shaders.');
   }
 
-  // =========================================================
-  // SCENE
-  // =========================================================
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#050607');
 
-  const scene =
-    new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
+  camera.position.set(0, 0, 11);
 
-  scene.background =
-    new THREE.Color('#050607');
-
-  // =========================================================
-  // CAMERA
-  // =========================================================
-
-  const camera =
-    new THREE.PerspectiveCamera(
-      50,
-      innerWidth / innerHeight,
-      0.05,
-      100
-    );
-
-  camera.position.set(
-    0,
-    0,
-    11
-  );
-
-  // =========================================================
-  // RENDERER
-  // =========================================================
-
-  const renderer =
-    new THREE.WebGPURenderer({
-      antialias: true
-    });
-
-  renderer.setPixelRatio(
-    Math.min(
-      devicePixelRatio,
-      2
-    )
-  );
-
-  renderer.setSize(
-    innerWidth,
-    innerHeight
-  );
-
-  mount.appendChild(
-    renderer.domElement
-  );
-
+  const renderer = new THREE.WebGPURenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  mount.appendChild(renderer.domElement);
   await renderer.init();
 
-  // =========================================================
-  // ORBIT CONTROLS
-  // =========================================================
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.enableDamping = true;
+  orbit.target.set(0, 0, 0);
 
-  const orbit =
-    new OrbitControls(
-      camera,
-      renderer.domElement
-    );
+  const params = createParameters();
+  const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
-  orbit.enableDamping =
-    true;
-
-  orbit.target.set(
-    0,
-    0,
-    0
+  const attractorHelper = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 16, 12),
+    new THREE.MeshBasicMaterial({ color: '#ffffff' })
   );
+  scene.add(attractorHelper);
 
-  // =========================================================
-  // PARAMETERS + SIMULATION
-  // =========================================================
-
-  const params =
-    createParameters();
-
-  const simulation =
-    createSimulation({
-      renderer,
-      scene,
-      params,
-      count: PARTICLE_COUNT
-    });
-
-  // =========================================================
-  // ATRACTOR
-  // =========================================================
-
-  const attractorHelper =
-    new THREE.Mesh(
-      new THREE.SphereGeometry(
-        0.12,
-        16,
-        12
-      ),
-
-      new THREE.MeshBasicMaterial({
-        color: '#ffffff'
-      })
-    );
-
-  scene.add(
-    attractorHelper
+  const performanceGuide = new THREE.Mesh(
+    new THREE.RingGeometry(0.13, 0.15, 48),
+    new THREE.MeshBasicMaterial({
+      color: '#ffffff', transparent: true, opacity: 0.35,
+      side: THREE.DoubleSide, depthWrite: false
+    })
   );
+  scene.add(performanceGuide);
+  performanceGuide.visible = false;
 
-  // =========================================================
-  // PERFORMANCE GUIDE
-  // =========================================================
+  const axes = new THREE.AxesHelper(1.5);
+  scene.add(axes);
 
-  const performanceGuide =
-    new THREE.Mesh(
-      new THREE.RingGeometry(
-        0.13,
-        0.15,
-        48
-      ),
+  let paused = false;
+  let mode = 'LAB';
+  let compressionHeld = false;
 
-      new THREE.MeshBasicMaterial({
-        color: '#ffffff',
-        transparent: true,
-        opacity: 0.35,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      })
-    );
+  const pointerNdc = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  const hit = new THREE.Vector3();
 
-  performanceGuide.visible =
-    false;
+  addEventListener('pointermove', (event) => {
+    pointerNdc.x = (event.clientX / innerWidth) * 2 - 1;
+    pointerNdc.y = -(event.clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
 
-  scene.add(
-    performanceGuide
-  );
-
-  // =========================================================
-  // AXES
-  // =========================================================
-
-  const axes =
-    new THREE.AxesHelper(
-      1.5
-    );
-
-  scene.add(
-    axes
-  );
-
-  // =========================================================
-  // POINTER
-  // =========================================================
-
-  const pointerNdc =
-    new THREE.Vector2();
-
-  const raycaster =
-    new THREE.Raycaster();
-
-  const interactionPlane =
-    new THREE.Plane(
-      new THREE.Vector3(
-        0,
-        0,
-        1
-      ),
-      0
-    );
-
-  const hit =
-    new THREE.Vector3();
-
-  addEventListener(
-    'pointermove',
-    (event) => {
-      pointerNdc.x =
-        (event.clientX / innerWidth) * 2 - 1;
-
-      pointerNdc.y =
-        -(event.clientY / innerHeight) * 2 + 1;
-
-      raycaster.setFromCamera(
-        pointerNdc,
-        camera
-      );
-
-      if (
-        raycaster.ray.intersectPlane(
-          interactionPlane,
-          hit
-        )
-      ) {
-        params.attractor.value.copy(
-          hit
-        );
-
-        attractorHelper.position.copy(
-          hit
-        );
-
-        performanceGuide.position.copy(
-          hit
-        );
-      }
+    if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
+      params.attractor.value.copy(hit);
+      attractorHelper.position.copy(hit);
+      performanceGuide.position.copy(hit);
     }
-  );
+  });
 
-  // =========================================================
-  // ESTADO
-  // =========================================================
+  addEventListener('contextmenu', (event) => event.preventDefault());
 
-  let paused =
-    false;
-
-  let mode =
-    'LAB';
-
-  let targetSphereBlend =
-    0.0;
-
-  // =========================================================
-  // ESTADO INICIAL
-  // =========================================================
-  //
-  // Todo comienza completamente quieto.
-  //
-  // Dirección = 0
-  // Velocidad = 0
-  //
-  // Por tanto no hay viento.
-  // =========================================================
-
-  params.sphereBlend.value =
-    0.0;
-
-  params.initialSpeed.value =
-    0.0;
-
-  params.windEnabled.value =
-    0.0;
-
-  params.windDirection.value =
-    0.0;
-
-  params.windSpeed.value =
-    0.0;
-
-  params.wind.value.set(
-    0,
-    0,
-    0
-  );
-
-  params.radialEnabled.value =
-    0.0;
-
-  params.vortexEnabled.value =
-    0.0;
-
-  params.dragEnabled.value =
-    0.0;
-
-  params.beat.value =
-    0.0;
-
-  params.staticTrigger.value =
-    0.0;
-
-  // =========================================================
-  // KICK
-  // =========================================================
-
-  const triggerBeat =
-    () => {
-      params.beat.value =
-        1.0;
-    };
-
-  // =========================================================
-  // ESTÁTICA
-  // =========================================================
-
-  const triggerStatic =
-    () => {
-      params.staticTrigger.value =
-        Math.min(
-          2.0,
-          params.staticTrigger.value + 1.0
-        );
-    };
-
-  // =========================================================
-  // PRESETS
-  // =========================================================
-
-  const applyPreset =
-    (id) => {
-      params.windEnabled.value =
-        0.0;
-
-      params.radialEnabled.value =
-        0.0;
-
-      params.vortexEnabled.value =
-        0.0;
-
-      params.dragEnabled.value =
-        0.0;
-
-      params.wind.value.set(
-        0,
-        0,
-        0
-      );
-
-      params.windSpeed.value =
-        0.0;
-
-      if (
-        id === 'inertia'
-      ) {
-        params.initialSpeed.value =
-          0.8;
-      }
-
-      else if (
-        id === 'wind'
-      ) {
-        params.windDirection.value =
-          1.0;
-
-        params.windSpeed.value =
-          1.0;
-
-        updateWind();
-      }
-
-      else if (
-        id === 'attract'
-      ) {
-        params.radialEnabled.value =
-          1.0;
-
-        params.radialStrength.value =
-          3.0;
-      }
-
-      else if (
-        id === 'repel'
-      ) {
-        params.radialEnabled.value =
-          1.0;
-
-        params.radialStrength.value =
-          -3.0;
-      }
-
-      else if (
-        id === 'vortex'
-      ) {
-        params.radialEnabled.value =
-          1.0;
-
-        params.radialStrength.value =
-          1.0;
-
-        params.vortexEnabled.value =
-          1.0;
-
-        params.vortexStrength.value =
-          3.0;
-
-        params.dragEnabled.value =
-          1.0;
-
-        params.dragCoefficient.value =
-          0.08;
-      }
-
-      simulation.reset();
-    };
-
-  // =========================================================
-  // LAB / PERFORMANCE
-  // =========================================================
-
-  const setMode =
-    (next) => {
-      mode =
-        next;
-
-      const lab =
-        mode === 'LAB';
-
-      document.body.classList.toggle(
-        'performance-mode',
-        !lab
-      );
-
-      panel.setVisible(
-        lab
-      );
-
-      axes.visible =
-        lab;
-
-      attractorHelper.visible =
-        lab;
-
-      performanceGuide.visible =
-        !lab;
-    };
-
-  // =========================================================
-  // PANEL
-  // =========================================================
-
-  const panel =
-    createLabPanel({
-      params,
-
-      onReset:
-        () => {
-          params.initialSpeed.value =
-            0.0;
-
-          params.windEnabled.value =
-            0.0;
-
-          // Centro del slider.
-          params.windDirection.value =
-            0.0;
-
-          // Inicio del slider.
-          params.windSpeed.value =
-            0.0;
-
-          params.wind.value.set(
-            0,
-            0,
-            0
-          );
-
-          params.radialEnabled.value =
-            0.0;
-
-          params.vortexEnabled.value =
-            0.0;
-
-          params.dragEnabled.value =
-            0.0;
-
-          params.beat.value =
-            0.0;
-
-          params.staticTrigger.value =
-            0.0;
-
-          params.sphereBlend.value =
-            0.0;
-
-          targetSphereBlend =
-            0.0;
-
-          simulation.reset();
-        },
-
-      onPreset:
-        applyPreset,
-
-      onBeat:
-        triggerBeat,
-
-      onModeChange:
-        () => {
-          setMode(
-            mode === 'LAB'
-              ? 'PERFORMANCE'
-              : 'LAB'
-          );
-        },
-
-      onPauseChange:
-        () => {
-          paused =
-            !paused;
-        }
-    });
-
-  // =========================================================
-  // INICIO
-  // =========================================================
-
-  setMode(
-    'LAB'
-  );
-
-  // =========================================================
-  // TECLADO
-  // =========================================================
-
-  addEventListener(
-    'keydown',
-    (event) => {
-      if (
-        event.repeat
-      ) {
-        return;
-      }
-
-      // -----------------------------------------------------
-      // P = LAB / PERFORMANCE
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyP'
-      ) {
-        setMode(
-          mode === 'LAB'
-            ? 'PERFORMANCE'
-            : 'LAB'
-        );
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // R = RESET
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyR'
-      ) {
-        params.initialSpeed.value =
-          0.0;
-
-        params.windEnabled.value =
-          0.0;
-
-        params.windDirection.value =
-          0.0;
-
-        params.windSpeed.value =
-          0.0;
-
-        params.wind.value.set(
-          0,
-          0,
-          0
-        );
-
-        params.radialEnabled.value =
-          0.0;
-
-        params.vortexEnabled.value =
-          0.0;
-
-        params.dragEnabled.value =
-          0.0;
-
-        params.beat.value =
-          0.0;
-
-        params.staticTrigger.value =
-          0.0;
-
-        params.sphereBlend.value =
-          0.0;
-
-        targetSphereBlend =
-          0.0;
-
-        simulation.reset();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // B = KICK
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyB'
-      ) {
-        triggerBeat();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // N = ESTÁTICA
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyN'
-      ) {
-        triggerStatic();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // Q = DIRECCIÓN -1
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyQ'
-      ) {
-        params.windDirection.value =
-          -1.0;
-
-        updateWind();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // W = DIRECCIÓN +1
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyW'
-      ) {
-        params.windDirection.value =
-          1.0;
-
-        updateWind();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // A = VELOCIDAD -1
-      //
-      // Mínimo = 0
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyA'
-      ) {
-        params.windSpeed.value =
-          Math.max(
-            0.0,
-            params.windSpeed.value - 1.0
-          );
-
-        updateWind();
-
-        return;
-      }
-
-      // -----------------------------------------------------
-      // S = VELOCIDAD +1
-      //
-      // Máximo = 10
-      // -----------------------------------------------------
-
-      if (
-        event.code === 'KeyS'
-      ) {
-        params.windSpeed.value =
-          Math.min(
-            10.0,
-            params.windSpeed.value + 1.0
-          );
-
-        updateWind();
-
-        return;
-      }
+  addEventListener('pointerdown', (event) => {
+    if (event.button === 0) {
+      params.beat.value = Math.max(params.beat.value, 0.9);
     }
-  );
+    if (event.button === 2) {
+      compressionHeld = true;
+      params.compression.value = 1.0;
+    }
+  });
 
-  // =========================================================
-  // ACTUALIZAR VIENTO
-  // =========================================================
+  addEventListener('pointerup', (event) => {
+    if (event.button === 2) {
+      compressionHeld = false;
+      params.compression.value = 0.0;
+    }
+  });
 
-  function updateWind() {
-    const speed =
-      params.windSpeed.value;
+  const setMode = (next) => {
+    mode = next;
+    const lab = mode === 'LAB';
+    document.body.classList.toggle('performance-mode', !lab);
+    panel.setVisible(lab);
+    axes.visible = lab;
+    attractorHelper.visible = lab && params.mode.value === 3;
+    performanceGuide.visible = !lab && params.mode.value === 3;
+  };
 
-    const direction =
-      params.windDirection.value;
+  const setParticleMode = (next) => {
+    params.mode.value = next;
+    params.sphereBlend.value = next === 1 ? 1.0 : 0.0;
+    params.radialEnabled.value = 0.0;
+    params.vortexEnabled.value = next === 3 ? 1.0 : 0.0;
+    params.crazyEnabled.value = next === 4 ? 1.0 : 0.0;
+    attractorHelper.visible = mode === 'LAB' && next === 3;
+    performanceGuide.visible = mode === 'PERFORMANCE' && next === 3;
+    simulation.reset();
+  };
 
-    // -------------------------------------------------------
-    // Sin velocidad
-    // -------------------------------------------------------
+  const triggerBeat = () => {
+    params.beat.value = 1.0;
+  };
 
-    if (
-      speed <= 0
-    ) {
-      params.wind.value.set(
-        0,
-        0,
-        0
-      );
+  const cycleColor = () => {
+    params.colorIndex.value = (params.colorIndex.value + 1) % 8;
+    params.colorTransition.value = 0.0;
+  };
 
-      params.windEnabled.value =
-        0.0;
+  const triggerFlash = () => {
+    params.flash.value = 1.0;
+  };
 
+  const toggleSlow = () => {
+    params.slowMotion.value = params.slowMotion.value > 0.5 ? 0.0 : 1.0;
+  };
+
+  const triggerStatic = () => {
+    params.staticTrigger.value = Math.min(2.0, params.staticTrigger.value + 1.0);
+  };
+
+  const updateWind = () => {
+    const speed = params.windSpeed.value;
+    const direction = params.windDirection.value;
+
+    if (speed <= 0 || direction === 0) {
+      params.wind.value.set(0, 0, 0);
+      params.windEnabled.value = 0;
       return;
     }
 
-    // -------------------------------------------------------
-    // Sin dirección
-    // -------------------------------------------------------
+    params.wind.value.set(direction * speed, 0, 0);
+    params.windEnabled.value = 1;
+  };
 
-    if (
-      direction === 0
-    ) {
-      params.wind.value.set(
-        0,
-        0,
-        0
-      );
+  const changeWindSpeed = (amount) => {
+    params.windSpeed.value = Math.max(0, Math.min(10, params.windSpeed.value + amount));
+    updateWind();
+  };
 
-      params.windEnabled.value =
-        0.0;
+  const changeWindDirection = (direction) => {
+    params.windDirection.value = direction;
+    updateWind();
+  };
 
-      return;
-    }
+  const reset = () => {
+    params.timeScale.value = 1.0;
+    params.maxSpeed.value = 30.0;
+    params.windEnabled.value = 0.0;
+    params.windDirection.value = 0.0;
+    params.windSpeed.value = 0.0;
+    params.wind.value.set(0, 0, 0);
+    params.radialEnabled.value = 0.0;
+    params.vortexEnabled.value = 0.0;
+    params.crazyEnabled.value = 0.0;
+    params.compression.value = 0.0;
+    params.flash.value = 0.0;
+    params.slowMotion.value = 0.0;
+    params.beat.value = 0.0;
+    params.staticTrigger.value = 0.0;
+    params.colorIndex.value = 0.0;
+    params.colorTransition.value = 1.0;
+    setParticleMode(0);
+  };
 
-    // -------------------------------------------------------
-    // Dirección × velocidad
-    //
-    // Q = -1
-    // W = +1
-    //
-    // -------------------------------------------------------
+  const panel = createLabPanel({
+    params,
+    onReset: reset,
+    onModeSelect: setParticleMode,
+    onBeat: triggerBeat,
+    onFlash: triggerFlash,
+    onColor: cycleColor,
+    onSlow: toggleSlow,
+    onStatic: triggerStatic,
+    onWindSpeed: changeWindSpeed,
+    onWindDirection: changeWindDirection,
+    onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
+    onPauseChange: () => { paused = !paused; }
+  });
 
-    params.wind.value.set(
-      direction * speed,
-      0,
-      0
-    );
+  setMode('LAB');
+  setParticleMode(0);
 
-    params.windEnabled.value =
-      1.0;
-  }
+  addEventListener('keydown', (event) => {
+    if (event.repeat) return;
 
-  // =========================================================
-  // RESIZE
-  // =========================================================
+    if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
+    else if (event.code === 'KeyR') reset();
+    else if (event.code === 'KeyB') triggerBeat();
+    else if (event.code === 'KeyN') triggerStatic();
+    else if (event.code === 'KeyC') cycleColor();
+    else if (event.code === 'KeyF') triggerFlash();
+    else if (event.code === 'KeyT') toggleSlow();
+    else if (event.code === 'Digit1') setParticleMode(0);
+    else if (event.code === 'Digit2') setParticleMode(1);
+    else if (event.code === 'Digit3') setParticleMode(2);
+    else if (event.code === 'Digit4') setParticleMode(3);
+    else if (event.code === 'Digit5') setParticleMode(4);
+    else if (event.code === 'KeyQ') changeWindDirection(-1);
+    else if (event.code === 'KeyW') changeWindDirection(1);
+    else if (event.code === 'KeyA') changeWindSpeed(-1);
+    else if (event.code === 'KeyS') changeWindSpeed(1);
+  });
 
-  addEventListener(
-    'resize',
-    () => {
-      camera.aspect =
-        innerWidth / innerHeight;
-
-      camera.updateProjectionMatrix();
-
-      renderer.setSize(
-        innerWidth,
-        innerHeight
-      );
-    }
-  );
-
-  // =========================================================
-  // RESET INICIAL
-  // =========================================================
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
 
   simulation.reset();
 
-  // =========================================================
-  // CLOCK
-  // =========================================================
+  const clock = new THREE.Clock();
 
-  const clock =
-    new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const delta = Math.min(clock.getDelta(), 0.05);
 
-  // =========================================================
-  // LOOP
-  // =========================================================
+    params.colorTransition.value = Math.min(1, params.colorTransition.value + delta * 5);
+    params.beat.value = Math.max(0, params.beat.value - delta * 5.0);
+    params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
+    params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
 
-  renderer.setAnimationLoop(
-    () => {
-      const delta =
-        Math.min(
-          clock.getDelta(),
-          0.05
-        );
+    if (!compressionHeld) params.compression.value = Math.max(0, params.compression.value - delta * 8.0);
 
-      // -----------------------------------------------------
-      // Transición de esfera
-      // -----------------------------------------------------
+    if (!paused) simulation.stepSimulation();
 
-      params.sphereBlend.value +=
-        (
-          targetSphereBlend -
-          params.sphereBlend.value
-        ) *
-        Math.min(
-          1.0,
-          delta * 4.0
-        );
-
-      // -----------------------------------------------------
-      // Decaimiento Kick
-      // -----------------------------------------------------
-
-      params.beat.value =
-        Math.max(
-          0,
-          params.beat.value -
-            delta * 8.0
-        );
-
-      // -----------------------------------------------------
-      // Decaimiento estática
-      // -----------------------------------------------------
-
-      params.staticTrigger.value =
-        Math.max(
-          0,
-          params.staticTrigger.value -
-            delta * 3.5
-        );
-
-      // -----------------------------------------------------
-      // Simulación
-      // -----------------------------------------------------
-
-      if (
-        !paused
-      ) {
-        simulation.stepSimulation();
-      }
-
-      // -----------------------------------------------------
-      // Cámara
-      // -----------------------------------------------------
-
-      orbit.update();
-
-      // -----------------------------------------------------
-      // Render
-      // -----------------------------------------------------
-
-      renderer.render(
-        scene,
-        camera
-      );
-    }
-  );
+    orbit.update();
+    renderer.render(scene, camera);
+  });
 }
 
-// ===========================================================
-// START
-// ===========================================================
-
-main().catch(
-  console.error
-);
+main().catch(console.error);
