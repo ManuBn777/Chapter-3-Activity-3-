@@ -10,7 +10,7 @@ const PARTICLE_COUNT = 131072;
 const WIND_ROTATE_SPEED = 2.4;
 const WIND_SPEED_MIN = 0;
 const WIND_SPEED_MAX = 25;
-const RIPPLE_DURATION = 1.1;
+const RIPPLE_DURATION = 0.8;
 
 async function main() {
   const mount = document.querySelector('#app');
