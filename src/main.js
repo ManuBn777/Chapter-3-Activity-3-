@@ -110,7 +110,13 @@ async function main() {
   );
   const hit = new THREE.Vector3();
 
-  const activate = () => {
+  // =========================================================
+  // ARRANQUE (Enter) — el único botón que enciende el sistema.
+  // Nada más lo hace: click, viento, etc. pueden registrar su
+  // acción, pero no se ve nada hasta presionar esto.
+  // =========================================================
+
+  const startEngine = () => {
     if (!hasSpread) {
       hasSpread = true;
       params.staticTrigger.value = 2.5;
@@ -150,8 +156,6 @@ async function main() {
   let nextRippleSlot = 0;
 
   const triggerRipple = () => {
-    activate();
-
     const slot = ripples[nextRippleSlot];
     slot.pos.value.copy(params.attractor.value);
     slot.life.value = 1.0;
@@ -165,7 +169,6 @@ async function main() {
     }
 
     if (event.button === 2) {
-      activate();
       compressionHeld = true;
       params.compression.value = 1.0;
     }
@@ -173,8 +176,6 @@ async function main() {
 
   addEventListener('pointerup', (event) => {
     if (event.button === 2) {
-      // No forzamos compression a 0 aquí: dejamos que la rampa del
-      // loop de render la devuelva suave a su estado original.
       compressionHeld = false;
     }
   });
@@ -228,7 +229,6 @@ async function main() {
   };
 
   const changeWindSpeed = (amount) => {
-    activate();
     windSpeedTarget = Math.max(
       WIND_SPEED_MIN,
       Math.min(WIND_SPEED_MAX, windSpeedTarget + amount)
@@ -236,7 +236,6 @@ async function main() {
   };
 
   const setWindSpeed = (value) => {
-    activate();
     windSpeedTarget = Math.max(
       WIND_SPEED_MIN,
       Math.min(WIND_SPEED_MAX, value)
@@ -244,12 +243,10 @@ async function main() {
   };
 
   const setWindAngle = (value) => {
-    activate();
     params.windAngle.value = value;
   };
 
   const rotateWindBy = (radians) => {
-    activate();
     params.windAngle.value += radians;
   };
 
@@ -293,6 +290,7 @@ async function main() {
   const panel = createLabPanel({
     params,
     onReset: reset,
+    onStart: startEngine,
     onModeSelect: setParticleMode,
     onBeat: triggerBeat,
     onRipple: triggerRipple,
@@ -323,6 +321,10 @@ async function main() {
     if (event.repeat) return;
 
     switch (event.code) {
+      case 'Enter':
+        startEngine();
+        break;
+
       case 'KeyP':
         setUiMode(uiMode === 'LAB' ? 'PERFORMANCE' : 'LAB');
         break;
@@ -415,12 +417,10 @@ async function main() {
     const delta = Math.min(clock.getDelta(), 0.05);
 
     if (heldKeys.has('KeyQ')) {
-      activate();
       params.windAngle.value -= WIND_ROTATE_SPEED * delta;
     }
 
     if (heldKeys.has('KeyW')) {
-      activate();
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
@@ -440,7 +440,6 @@ async function main() {
       params.slowMotion.value += slowDiff * Math.min(1, delta * 6);
     }
 
-    // Ondas: decaen con el tiempo (vida 1 -> 0 en RIPPLE_DURATION seg).
     ripples.forEach((r) => {
       if (r.life.value > 0) {
         r.life.value = Math.max(0, r.life.value - delta / RIPPLE_DURATION);
@@ -473,5 +472,4 @@ async function main() {
   });
 }
 
-main().catch(console.error);
 main().catch(console.error);
