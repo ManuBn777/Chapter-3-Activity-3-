@@ -16,15 +16,16 @@ export function createParameters() {
 
     // ATRACTOR / PUNTERO
     attractor: uniform(new Vector3(0, 0, 0)),
-    pointerOrbitRadius: uniform(1.3),
+    // Radio de órbita más generoso + variación por partícula, para
+    // que se vea como un enjambre con volumen, no un punto comprimido.
+    pointerOrbitRadius: uniform(3.2),
+    pointerOrbitVariance: uniform(1.4),
 
     // MODOS
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
-    circleRadius: uniform(5.5),
-    // circleExpansion: desplazamiento elástico del radio del Círculo,
-    // manejado por un resorte físico en main.js. 0 = radio base.
+    circleRadius: uniform(4.0),
     circleExpansion: uniform(0.0),
     beatExpansion: uniform(0.8),
 
