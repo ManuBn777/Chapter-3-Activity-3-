@@ -110,12 +110,6 @@ async function main() {
   );
   const hit = new THREE.Vector3();
 
-  // =========================================================
-  // ARRANQUE (Enter) — el único botón que enciende el sistema.
-  // Nada más lo hace: click, viento, etc. pueden registrar su
-  // acción, pero no se ve nada hasta presionar esto.
-  // =========================================================
-
   const startEngine = () => {
     if (!hasSpread) {
       hasSpread = true;
@@ -141,10 +135,6 @@ async function main() {
   addEventListener('contextmenu', (event) => {
     event.preventDefault();
   });
-
-  // =========================================================
-  // ONDAS (click izquierdo) — pool de 4 slots
-  // =========================================================
 
   const ripples = [
     { pos: params.ripple0Pos, life: params.ripple0Life },
@@ -177,6 +167,8 @@ async function main() {
   addEventListener('pointerup', (event) => {
     if (event.button === 2) {
       compressionHeld = false;
+      // Empujón hacia afuera al soltar, para que se expandan de vuelta.
+      params.releaseBurst.value = 1.0;
     }
   });
 
@@ -204,6 +196,13 @@ async function main() {
 
     attractorHelper.visible = uiMode === 'LAB' && next === 3;
     performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
+
+    // Arena y Neutro no tienen fuerza propia que las mantenga juntas:
+    // si venimos de un modo comprimido (Esfera/Círculo), les damos
+    // un empujón de dispersión inmediato al entrar.
+    if (next === 0 || next === 4) {
+      params.staticTrigger.value = Math.max(params.staticTrigger.value, 2.0);
+    }
   };
 
   const triggerBeat = () => {
@@ -266,6 +265,7 @@ async function main() {
     params.crazyEnabled.value = 0.0;
     params.crazyTrigger.value = 0.0;
     params.compression.value = 0.0;
+    params.releaseBurst.value = 0.0;
     params.flash.value = 0.0;
     params.beat.value = 0.0;
     params.staticTrigger.value = 0.0;
@@ -451,6 +451,7 @@ async function main() {
     params.staticTrigger.value = Math.max(0, params.staticTrigger.value - delta * 4.0);
     params.crazyTrigger.value = Math.max(0, params.crazyTrigger.value - delta * 1.2);
     params.flash.value = Math.max(0, params.flash.value - delta * 5.0);
+    params.releaseBurst.value = Math.max(0, params.releaseBurst.value - delta * 3.0);
 
     if (!compressionHeld) {
       params.compression.value = Math.max(0, params.compression.value - delta * 8.0);
