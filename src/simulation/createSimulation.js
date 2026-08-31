@@ -137,8 +137,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // CÍRCULO — respira/late con cada Kick (resorte elástico,
-      // deformación orgánica más sutil, menos espinas)
+      // CÍRCULO
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -146,8 +145,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radial = xy.div(radius);
         const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
-        // Solo 2 frecuencias combinadas (antes 3), y la segunda mucho
-        // más débil — el bulto es más redondeado, menos espinoso.
         const organicWobble = sin(p.x.mul(3.0).add(p.y.mul(2.0)))
           .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.25));
 
@@ -175,8 +172,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO — enjambre con volumen, no un punto comprimido.
-      // Cada partícula orbita a un radio ligeramente distinto.
+      // PUNTERO — estela orgánica: cada partícula tiene su propia
+      // "pereza" fija, así nunca colapsan en un punto al perseguir
+      // un puntero rápido, sino que forman un rastro con volumen.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -207,11 +205,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             .cross(direction)
             .mul(8.0);
 
+        const personalPhase =
+          hash(instanceIndex.add(uint(613)));
+
+        const followStrength =
+          mix(0.32, 0.035, personalPhase);
+
         v.assign(
           mix(
             v,
             radial.add(orbit),
-            0.16
+            followStrength
           )
         );
       });
