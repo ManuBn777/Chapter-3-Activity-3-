@@ -137,7 +137,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // CÍRCULO
+      // CÍRCULO — respira/late con cada Kick (resorte elástico)
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -145,9 +145,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radial = xy.div(radius);
         const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
+        // Deformación orgánica: 3 frecuencias de seno combinadas
+        // según la posición — el abultamiento no es uniforme, unas
+        // zonas del anillo sobresalen más que otras (como una
+        // membrana golpeada, no un círculo perfecto expandiéndose).
+        const organicWobble = sin(p.x.mul(3.0).add(p.y.mul(2.0)))
+          .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.6))
+          .add(sin(p.x.mul(1.7).add(p.y.mul(6.5))).mul(0.4));
+
+        // El radio objetivo = radio base + el "latido" del resorte
+        // (params.circleExpansion, manejado en JS) + el abultamiento
+        // orgánico, que solo aparece mientras hay expansión activa.
+        const effectiveRadius = params.circleRadius
+          .add(params.circleExpansion.mul(2.2))
+          .add(organicWobble.mul(params.circleExpansion).mul(1.1));
+
         const radiusCorrection =
           radial
-            .mul(params.circleRadius.sub(radius))
+            .mul(effectiveRadius.sub(radius))
             .mul(18.0);
 
         const circleVelocity =
@@ -159,22 +174,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             radiusCorrection.add(circleVelocity),
             0.25
           )
-        );
-
-        const spikes =
-          sin(
-            p.x.mul(8.0)
-              .add(p.y.mul(7.0))
-          )
-            .abs();
-
-        v.addAssign(
-          radial
-            .mul(spikes)
-            .mul(params.beat)
-            .mul(params.beatStrength)
-            .mul(25.0)
-            .mul(dt)
         );
 
         v.z.assign(v.z.mul(0.05));
@@ -214,7 +213,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // NEUTRO — agua calmada, sin viento, fluye muy suave
+      // NEUTRO — agua calmada, sin viento
       // =====================================================
       If(params.mode.greaterThan(3.5), () => {
         const calmFlow = vec3(
@@ -229,7 +228,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // KICK (B)
+      // KICK (B) — empuje global (Esfera y demás; Círculo usa su
+      // propio resorte, ver arriba)
       // =====================================================
       If(params.beat.greaterThan(0.01), () => {
         const direction = p.normalize();
@@ -244,20 +244,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // ONDAS (click izquierdo) — gota en agua: frente definido
-      // que nace en el punto de impacto y viaja radialmente hacia
-      // afuera, intensidad máxima justo en el frente.
+      // ONDAS (click izquierdo) — gota en agua, más contundente
       // =====================================================
       const isArenaMode = step(0.5, params.mode).oneMinus();
-      const rippleStrength = mix(16.0, 32.0, isArenaMode);
+      const rippleStrength = mix(35.0, 70.0, isArenaMode);
 
       const rippleForce = (origin, life) => {
         const toParticle = p.sub(origin);
         const dist = max(toParticle.length(), 0.001);
         const dir = toParticle.div(dist);
 
-        const ringRadius = life.oneMinus().mul(5.0);
-        const ringWidth = 1.0;
+        const ringRadius = life.oneMinus().mul(6.0);
+        const ringWidth = 1.8;
 
         const diff = dist.sub(ringRadius).abs();
         const falloff = max(diff.div(ringWidth).oneMinus(), 0.0);
@@ -346,7 +344,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // COMPRESIÓN (click derecho) — hacia el punto (0,0,0)
+      // COMPRESIÓN (click derecho)
       // =====================================================
       const compressionTarget =
         mix(p, vec3(0.0, 0.0, 0.0), params.compression);
@@ -360,10 +358,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
-      // LIBERACIÓN / EXPANDIR (click derecho al soltar, o Espacio)
-      // Dirección aleatoria fija por partícula — no la posición
-      // actual — así siempre se reparten bien sin importar qué
-      // tan comprimidas/juntas estén.
+      // LIBERACIÓN / EXPANDIR
       // =====================================================
       If(params.releaseBurst.greaterThan(0.01), () => {
         const randomDir = vec3(
