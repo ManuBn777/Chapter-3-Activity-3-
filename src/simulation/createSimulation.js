@@ -137,7 +137,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // CÍRCULO — respira/late con cada Kick (resorte elástico)
+      // CÍRCULO — respira/late con cada Kick (resorte elástico,
+      // deformación orgánica más sutil, menos espinas)
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -145,20 +146,14 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radial = xy.div(radius);
         const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
-        // Deformación orgánica: 3 frecuencias de seno combinadas
-        // según la posición — el abultamiento no es uniforme, unas
-        // zonas del anillo sobresalen más que otras (como una
-        // membrana golpeada, no un círculo perfecto expandiéndose).
+        // Solo 2 frecuencias combinadas (antes 3), y la segunda mucho
+        // más débil — el bulto es más redondeado, menos espinoso.
         const organicWobble = sin(p.x.mul(3.0).add(p.y.mul(2.0)))
-          .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.6))
-          .add(sin(p.x.mul(1.7).add(p.y.mul(6.5))).mul(0.4));
+          .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.25));
 
-        // El radio objetivo = radio base + el "latido" del resorte
-        // (params.circleExpansion, manejado en JS) + el abultamiento
-        // orgánico, que solo aparece mientras hay expansión activa.
         const effectiveRadius = params.circleRadius
-          .add(params.circleExpansion.mul(2.2))
-          .add(organicWobble.mul(params.circleExpansion).mul(1.1));
+          .add(params.circleExpansion.mul(2.0))
+          .add(organicWobble.mul(params.circleExpansion).mul(0.55));
 
         const radiusCorrection =
           radial
@@ -180,7 +175,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO
+      // PUNTERO — enjambre con volumen, no un punto comprimido.
+      // Cada partícula orbita a un radio ligeramente distinto.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -192,8 +188,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const direction =
           toPointer.div(distance);
 
+        const radiusVariance =
+          hash(instanceIndex.add(uint(509)))
+            .sub(0.5)
+            .mul(params.pointerOrbitVariance);
+
+        const targetRadius =
+          params.pointerOrbitRadius.add(radiusVariance);
+
         const radiusError =
-          distance.sub(params.pointerOrbitRadius);
+          distance.sub(targetRadius);
 
         const radial =
           direction.mul(radiusError.mul(6.0));
@@ -228,8 +232,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // KICK (B) — empuje global (Esfera y demás; Círculo usa su
-      // propio resorte, ver arriba)
+      // KICK (B)
       // =====================================================
       If(params.beat.greaterThan(0.01), () => {
         const direction = p.normalize();
@@ -244,7 +247,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // ONDAS (click izquierdo) — gota en agua, más contundente
+      // ONDAS (click izquierdo)
       // =====================================================
       const isArenaMode = step(0.5, params.mode).oneMinus();
       const rippleStrength = mix(35.0, 70.0, isArenaMode);
