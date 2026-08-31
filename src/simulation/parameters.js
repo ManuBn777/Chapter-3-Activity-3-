@@ -39,19 +39,18 @@ export function createParameters() {
     dragEnabled: uniform(0.0),
     dragCoefficient: uniform(0.08),
 
-    // VIENTO
+    // VIENTO (no aplica en Neutro)
     windAngle: uniform(0.0),
     windSpeed: uniform(0.0),
 
     // INERCIA
     initialSpeed: uniform(0.0),
 
-    // KICK (B) — empuje global desde el centro del mundo
+    // KICK (B)
     beat: uniform(0.0),
     beatStrength: uniform(1.0),
 
-    // ONDAS (click izquierdo) — hasta 4 simultáneas, cada una con
-    // su propio origen y "vida" (1 = recién creada, 0 = desaparecida)
+    // ONDAS (click izquierdo)
     ripple0Pos: uniform(new Vector3(0, 0, 0)),
     ripple0Life: uniform(0.0),
     ripple1Pos: uniform(new Vector3(0, 0, 0)),
@@ -61,12 +60,16 @@ export function createParameters() {
     ripple3Pos: uniform(new Vector3(0, 0, 0)),
     ripple3Life: uniform(0.0),
 
-    // ESTÁTICA (N) — sin cambios
+    // ESTÁTICA (N)
     staticTrigger: uniform(0.0),
     staticStrength: uniform(3.0),
 
-    // LOCURA (L) — agitación fuerte pero contenida cerca del centro
+    // LOCURA (L)
     crazyTrigger: uniform(0.0),
+
+    // COMPRESIÓN (click derecho) — hacia el punto (0,0,0), y
+    // releaseBurst empuja hacia afuera al soltar.
+    releaseBurst: uniform(0.0),
 
     // ARENA / NEUTRO — límite en caja 3D
     boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
