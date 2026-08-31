@@ -172,9 +172,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO — estela orgánica: cada partícula tiene su propia
-      // "pereza" fija, así nunca colapsan en un punto al perseguir
-      // un puntero rápido, sino que forman un rastro con volumen.
+      // PUNTERO — estela orgánica con "pereza" por partícula
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -317,14 +315,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // GRANO (jitter permanente por partícula)
+      // GRANO (jitter permanente por partícula) — radialmente
+      // simétrico (usa la distancia al centro, no p.x/p.y/p.z
+      // por separado), así no genera sesgo de ejes/rectangular.
       // =====================================================
       const grainPhase = hash(instanceIndex.add(uint(101)));
+      const radialPhase = p.length().mul(3.0);
 
       const grain = vec3(
-        sin(grainPhase.mul(37.0).add(p.x.mul(3.0))),
-        cos(grainPhase.mul(53.0).add(p.y.mul(3.0))),
-        sin(grainPhase.mul(71.0).add(p.z.mul(3.0)))
+        sin(grainPhase.mul(37.0).add(radialPhase)),
+        cos(grainPhase.mul(53.0).add(radialPhase)),
+        sin(grainPhase.mul(71.0).add(radialPhase))
       );
 
       If(params.mode.lessThan(3.5), () => {
