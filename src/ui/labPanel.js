@@ -58,6 +58,7 @@ export function createLabPanel({
   onSlow,
   onStatic,
   onCrazy,
+  onExpand,
   onWindSpeed,
   onWindAngle,
   onWindFlip180,
@@ -93,6 +94,7 @@ export function createLabPanel({
   button(effects, 'Slow motion (T)', onSlow);
   button(effects, 'Estática (N)', onStatic);
   button(effects, 'Locura (L)', onCrazy);
+  button(effects, 'Expandir ⚡ (Espacio)', onExpand);
 
   const wind = section(panel, 'Viento · A/S vel. + Q/W rotación');
   rangeRow(wind, 'Velocidad A/S (0-25)', () => params.windSpeed.value, 0, 25, 1, onWindSpeed);
