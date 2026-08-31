@@ -19,7 +19,6 @@ export function createParameters() {
     pointerOrbitRadius: uniform(1.3),
 
     // MODOS
-    // 0 Arena, 1 Esfera, 2 Círculo, 3 Puntero, 4 Neutro
     mode: uniform(0.0),
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
@@ -39,7 +38,7 @@ export function createParameters() {
     dragEnabled: uniform(0.0),
     dragCoefficient: uniform(0.08),
 
-    // VIENTO (no aplica en Neutro)
+    // VIENTO
     windAngle: uniform(0.0),
     windSpeed: uniform(0.0),
 
@@ -67,15 +66,16 @@ export function createParameters() {
     // LOCURA (L)
     crazyTrigger: uniform(0.0),
 
-    // COMPRESIÓN (click derecho) — hacia el punto (0,0,0), y
-    // releaseBurst empuja hacia afuera al soltar.
+    // COMPRESIÓN (click derecho)
     releaseBurst: uniform(0.0),
 
-    // ARENA / NEUTRO — límite en caja 3D
-    boundsSize: uniform(new Vector3(8.0, 5.0, 6.0)),
+    // ARENA / NEUTRO — límite en caja 3D.
+    // Agrandada para que quepa cómodo el radio del Círculo (5.5)
+    // y así el paso Círculo → Arena no haga un salto (wrap) brusco.
+    boundsSize: uniform(new Vector3(13.0, 13.0, 7.0)),
 
     // CONTENCIÓN
-    containmentRadius: uniform(14.0),
+    containmentRadius: uniform(18.0),
 
     // COMPATIBILIDAD
     spinDirection: uniform(0.0),
