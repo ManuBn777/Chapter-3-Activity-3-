@@ -36,8 +36,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       0.0
     );
 
-    // Neutro: repartidas por todo el espacio (como Arena antes de
-    // que Arena se volviera un punto compacto).
     const scattered = vec3(
       r1.sub(0.5),
       r2.sub(0.5),
@@ -216,7 +214,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // NEUTRO — agua calmada, fluye muy suave por todo el espacio
+      // NEUTRO — agua calmada, sin viento, fluye muy suave
       // =====================================================
       If(params.mode.greaterThan(3.5), () => {
         const calmFlow = vec3(
@@ -231,7 +229,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // KICK (B) — empuje global desde el centro del mundo
+      // KICK (B)
       // =====================================================
       If(params.beat.greaterThan(0.01), () => {
         const direction = p.normalize();
@@ -246,20 +244,22 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // ONDAS (click izquierdo) — hasta 4 gotas en agua simultáneas
+      // ONDAS (click izquierdo) — gotas en agua, hasta 4 a la vez
       // =====================================================
       const rippleForce = (origin, life) => {
         const toParticle = p.sub(origin);
         const dist = max(toParticle.length(), 0.001);
         const dir = toParticle.div(dist);
 
-        const ringRadius = life.oneMinus().mul(5.0);
-        const ringWidth = 1.0;
+        // El anillo empieza con un radio pequeño ya visible (0.3)
+        // y crece hasta ~5.8 conforme la onda se apaga.
+        const ringRadius = life.oneMinus().mul(5.5).add(0.3);
+        const ringWidth = 1.6;
 
         const diff = dist.sub(ringRadius).abs();
         const falloff = max(diff.div(ringWidth).oneMinus(), 0.0);
 
-        return dir.mul(falloff).mul(life).mul(9.0);
+        return dir.mul(falloff).mul(life).mul(14.0);
       };
 
       v.addAssign(
@@ -271,7 +271,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
-      // STATIC (N) — sin cambios
+      // STATIC (N)
       // =====================================================
       If(params.staticTrigger.greaterThan(0.01), () => {
         const random = vec3(
@@ -290,7 +290,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // LOCURA (L) — se agitan fuerte pero se quedan cerca/dentro
+      // LOCURA (L)
       // =====================================================
       If(params.crazyTrigger.greaterThan(0.01), () => {
         const shake = vec3(
@@ -310,6 +310,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
       // =====================================================
       // GRANO (jitter permanente por partícula)
+      // Más suave en Neutro para que se sienta realmente calmado.
       // =====================================================
       const grainPhase = hash(instanceIndex.add(uint(101)));
 
@@ -319,40 +320,57 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         sin(grainPhase.mul(71.0).add(p.z.mul(3.0)))
       );
 
-      v.addAssign(grain.mul(0.7).mul(dt));
+      If(params.mode.lessThan(3.5), () => {
+        v.addAssign(grain.mul(0.7).mul(dt));
+      });
+
+      If(params.mode.greaterThan(3.5), () => {
+        v.addAssign(grain.mul(0.12).mul(dt));
+      });
 
       // =====================================================
-      // VIENTO (universal, todos los modos)
+      // VIENTO — todos los modos EXCEPTO Neutro
       // =====================================================
-      const windDir = vec3(
-        cos(params.windAngle),
-        sin(params.windAngle),
-        0.0
-      );
+      If(params.mode.lessThan(3.5), () => {
+        const windDir = vec3(
+          cos(params.windAngle),
+          sin(params.windAngle),
+          0.0
+        );
 
-      const wind = windDir.mul(params.windSpeed).mul(3.0);
+        const wind = windDir.mul(params.windSpeed).mul(3.0);
 
-      v.addAssign(wind.mul(dt));
+        v.addAssign(wind.mul(dt));
+      });
 
       // =====================================================
-      // COMPRESIÓN
+      // COMPRESIÓN (click derecho) — hacia el punto (0,0,0)
       // =====================================================
       const compressionTarget =
-        p.mul(
-          mix(
-            1.0,
-            0.18,
-            params.compression
-          )
-        );
+        mix(p, vec3(0.0, 0.0, 0.0), params.compression);
 
       v.addAssign(
         compressionTarget
           .sub(p)
-          .mul(12.0)
+          .mul(14.0)
           .mul(params.compression)
           .mul(dt)
       );
+
+      // =====================================================
+      // LIBERACIÓN (al soltar click derecho) — vuelve a expandirse
+      // =====================================================
+      If(params.releaseBurst.greaterThan(0.01), () => {
+        const dist = max(p.length(), 0.05);
+        const direction = p.div(dist);
+
+        v.addAssign(
+          direction
+            .mul(params.releaseBurst)
+            .mul(16.0)
+            .mul(dt)
+        );
+      });
 
       // =====================================================
       // CONTENCIÓN
@@ -386,7 +404,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       p.addAssign(v.mul(dt));
 
       // =====================================================
-      // ARENA / NEUTRO WRAP (límite en caja 3D)
+      // ARENA / NEUTRO WRAP
       // =====================================================
       If(params.mode.lessThan(0.5), () => {
         const half = params.boundsSize.mul(0.5);
