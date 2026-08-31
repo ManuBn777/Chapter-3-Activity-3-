@@ -246,19 +246,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       // =====================================================
       // ONDAS (click izquierdo) — gota en agua: frente definido
       // que nace en el punto de impacto y viaja radialmente hacia
-      // afuera, intensidad máxima justo en el frente. Más fuerte
-      // en Arena para que no se pierda contra el remolino ambiental.
+      // afuera, intensidad máxima justo en el frente.
       // =====================================================
       const isArenaMode = step(0.5, params.mode).oneMinus();
-      const rippleStrength = mix(9.0, 20.0, isArenaMode);
+      const rippleStrength = mix(16.0, 32.0, isArenaMode);
 
       const rippleForce = (origin, life) => {
         const toParticle = p.sub(origin);
         const dist = max(toParticle.length(), 0.001);
         const dir = toParticle.div(dist);
 
-        // Nace en radio 0 (el punto exacto del click) y crece
-        // hasta ~5 unidades conforme la onda se apaga.
         const ringRadius = life.oneMinus().mul(5.0);
         const ringWidth = 1.0;
 
@@ -363,16 +360,24 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       );
 
       // =====================================================
-      // LIBERACIÓN (al soltar click derecho)
+      // LIBERACIÓN / EXPANDIR (click derecho al soltar, o Espacio)
+      // Dirección aleatoria fija por partícula — no la posición
+      // actual — así siempre se reparten bien sin importar qué
+      // tan comprimidas/juntas estén.
       // =====================================================
       If(params.releaseBurst.greaterThan(0.01), () => {
-        const dist = max(p.length(), 0.05);
-        const direction = p.div(dist);
+        const randomDir = vec3(
+          hash(instanceIndex.add(uint(211))),
+          hash(instanceIndex.add(uint(307))),
+          hash(instanceIndex.add(uint(401)))
+        )
+          .sub(0.5)
+          .normalize();
 
         v.addAssign(
-          direction
+          randomDir
             .mul(params.releaseBurst)
-            .mul(16.0)
+            .mul(18.0)
             .mul(dt)
         );
       });
