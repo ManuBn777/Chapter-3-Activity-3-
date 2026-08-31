@@ -49,6 +49,7 @@ function section(panel, title) {
 export function createLabPanel({
   params,
   onReset,
+  onStart,
   onModeSelect,
   onBeat,
   onRipple,
@@ -71,6 +72,9 @@ export function createLabPanel({
     <h1>U3 · Forces Instrument</h1>
     <p>LAB: prueba modos y fuerzas. <strong>P</strong> cambia a PERFORMANCE.</p>
   `;
+
+  const start = section(panel, 'Arranque');
+  button(start, 'Iniciar (Enter)', onStart);
 
   const modes = section(panel, 'Modos');
   [
