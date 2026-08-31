@@ -167,7 +167,6 @@ async function main() {
   addEventListener('pointerup', (event) => {
     if (event.button === 2) {
       compressionHeld = false;
-      // Empujón hacia afuera al soltar, para que se expandan de vuelta.
       params.releaseBurst.value = 1.0;
     }
   });
@@ -197,9 +196,6 @@ async function main() {
     attractorHelper.visible = uiMode === 'LAB' && next === 3;
     performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
 
-    // Arena y Neutro no tienen fuerza propia que las mantenga juntas:
-    // si venimos de un modo comprimido (Esfera/Círculo), les damos
-    // un empujón de dispersión inmediato al entrar.
     if (next === 0 || next === 4) {
       params.staticTrigger.value = Math.max(params.staticTrigger.value, 2.0);
     }
@@ -215,6 +211,13 @@ async function main() {
 
   const triggerCrazy = () => {
     params.crazyTrigger.value = Math.min(2.0, params.crazyTrigger.value + 1.0);
+  };
+
+  // Botón "pánico": empuje fuerte + dispersión aleatoria, disponible
+  // en cualquier momento por si algo se apelmaza.
+  const triggerEpicExpand = () => {
+    params.releaseBurst.value = 1.6;
+    params.staticTrigger.value = Math.max(params.staticTrigger.value, 1.5);
   };
 
   const toggleSlow = () => {
@@ -299,6 +302,7 @@ async function main() {
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onCrazy: triggerCrazy,
+    onExpand: triggerEpicExpand,
     onWindSpeed: setWindSpeed,
     onWindAngle: setWindAngle,
     onWindFlip180: () => rotateWindBy(Math.PI),
@@ -323,6 +327,11 @@ async function main() {
     switch (event.code) {
       case 'Enter':
         startEngine();
+        break;
+
+      case 'Space':
+        event.preventDefault();
+        triggerEpicExpand();
         break;
 
       case 'KeyP':
