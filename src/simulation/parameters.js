@@ -23,6 +23,9 @@ export function createParameters() {
     sphereBlend: uniform(0.0),
     baseRadius: uniform(3.0),
     circleRadius: uniform(5.5),
+    // circleExpansion: desplazamiento elástico del radio del Círculo,
+    // manejado por un resorte físico en main.js. 0 = radio base.
+    circleExpansion: uniform(0.0),
     beatExpansion: uniform(0.8),
 
     // FUERZA RADIAL
@@ -69,9 +72,7 @@ export function createParameters() {
     // COMPRESIÓN (click derecho)
     releaseBurst: uniform(0.0),
 
-    // ARENA / NEUTRO — límite en caja 3D.
-    // Agrandada para que quepa cómodo el radio del Círculo (5.5)
-    // y así el paso Círculo → Arena no haga un salto (wrap) brusco.
+    // ARENA / NEUTRO
     boundsSize: uniform(new Vector3(13.0, 13.0, 7.0)),
 
     // CONTENCIÓN
