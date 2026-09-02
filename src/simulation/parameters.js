@@ -78,7 +78,7 @@ export function createParameters() {
     boundsSize: uniform(new Vector3(13.0, 13.0, 7.0)),
 
     // CONTENCIÓN
-    containmentRadius: uniform(18.0),
+    containmentRadius: uniform(30.0),
 
     // COMPATIBILIDAD
     spinDirection: uniform(0.0),
