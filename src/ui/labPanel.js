@@ -56,8 +56,8 @@ export function createLabPanel({
   onFlash,
   onColor,
   onColorFlowToggle,
-  onExpandSphere,
-  onCompressSphere,
+  onExpandRadius,
+  onCompressRadius,
   onSlow,
   onStatic,
   onCrazy,
@@ -89,9 +89,9 @@ export function createLabPanel({
     [4, '5 · Neutro']
   ].forEach(([id, label]) => button(modes, label, () => onModeSelect(id)));
 
-  const sphere = section(panel, 'Esfera');
-  button(sphere, 'Expandir +', onExpandSphere);
-  button(sphere, 'Comprimir −', onCompressSphere);
+  const radius = section(panel, 'Esfera / Círculo · +/-');
+  button(radius, 'Expandir +', onExpandRadius);
+  button(radius, 'Comprimir −', onCompressRadius);
 
   const effects = section(panel, 'Efectos');
   button(effects, 'Kick / Bounce (B)', onBeat);
