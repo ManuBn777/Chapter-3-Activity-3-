@@ -171,8 +171,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         v.z.assign(v.z.mul(0.05));
       });
 
-// =====================================================
-      // PUNTERO — estela orgánica con "pereza" por partícula
+  // =====================================================
+      // PUNTERO — campo de arrastre fuerte: alcanza rápido los
+      // cambios de posición, se queda cerca incluso con
+      // movimientos rápidos del mouse.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -195,19 +197,26 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radiusError =
           distance.sub(targetRadius);
 
+        // Arrastre fuerte: prioriza alcanzar al puntero por
+        // encima de mantener la órbita perfecta.
         const radial =
-          direction.mul(radiusError.mul(10.0));
+          direction.mul(radiusError.mul(20.0));
 
+        // Órbita más discreta — da la curva orgánica al girar,
+        // sin sumar tanta distancia extra mientras persigue.
         const orbit =
           vec3(0.0, 0.0, 1.0)
             .cross(direction)
-            .mul(10.0);
+            .mul(6.0);
 
         const personalPhase =
           hash(instanceIndex.add(uint(613)));
 
+        // Rango de "pereza" más angosto: incluso la partícula
+        // más lenta sigue de cerca, solo con un poco más de
+        // suavidad que la más rápida.
         const followStrength =
-          mix(0.6, 0.15, personalPhase);
+          mix(0.85, 0.45, personalPhase);
 
         v.assign(
           mix(
