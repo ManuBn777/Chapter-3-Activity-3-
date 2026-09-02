@@ -93,27 +93,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         );
       });
 
-      // =====================================================
-      // ESFERA — con selector de forma (sphereShape)
+          // =====================================================
+      // ESFERA — con selector de forma (sphereShape) y rotación
+      // (sphereRotation, J/K). Se rota el punto de muestreo antes
+      // de evaluar la forma, así el mundo ve la figura girada.
       // =====================================================
       If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
         const euclidLen = max(p.length(), 0.001);
         const normal = p.div(euclidLen);
 
-        const cubeDist = max(max(p.x.abs(), p.y.abs()), p.z.abs());
-        const diamondDist = p.x.abs().add(p.y.abs()).add(p.z.abs());
+        const rc = cos(params.sphereRotation);
+        const rs = sin(params.sphereRotation);
+        const rx = p.x.mul(rc).sub(p.z.mul(rs));
+        const rz = p.x.mul(rs).add(p.z.mul(rc));
+        const ry = p.y;
 
-        const heightTRaw =
-          p.z.add(params.baseRadius).div(params.baseRadius.mul(2.0));
+        const cubeDist = max(max(rx.abs(), ry.abs()), rz.abs());
+        const diamondDist = rx.abs().add(ry.abs()).add(rz.abs());
 
-        const heightT =
-          max(heightTRaw, 0.0).oneMinus().max(0.0).oneMinus();
+        // Pirámide: punta hacia +Y (arriba en pantalla), base hacia
+        // -Y. Antes usaba Z (hacia la cámara) — por eso no se veía
+        // como pirámide, la punta apuntaba directo a ti.
+        const widthScale =
+          params.baseRadius.sub(ry).div(params.baseRadius.mul(2.0));
 
-        const squareDist = max(p.x.abs(), p.y.abs());
+        const squareXZ = max(rx.abs(), rz.abs());
 
         const pyramidDist = max(
-          squareDist.div(max(heightT.oneMinus(), 0.08)),
-          p.z.abs()
+          squareXZ.div(max(widthScale, 0.04)),
+          ry.abs()
         );
 
         const s = params.sphereShape;
@@ -149,7 +157,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           )
         );
       });
-
       // =====================================================
       // CÍRCULO — anillo liso, respira con el Kick (resorte)
       // =====================================================
