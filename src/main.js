@@ -16,10 +16,14 @@ const CIRCLE_SPRING_STIFFNESS = 70;
 const CIRCLE_SPRING_DAMPING = 6;
 const CIRCLE_KICK_IMPULSE = 16;
 
-const SPHERE_RADIUS_MIN = 1.0;
-const SPHERE_RADIUS_MAX = 8.0;
+// Esfera: rango amplio a propósito — desde casi un punto comprimido
+// hasta un radio tan grande que la cámara (a 11 unidades del centro)
+// termina literalmente dentro de la esfera.
+const SPHERE_RADIUS_MIN = 0.15;
+const SPHERE_RADIUS_MAX = 20.0;
 const SPHERE_RADIUS_DEFAULT = 3.0;
-const SPHERE_RADIUS_STEP = 0.6;
+const SPHERE_RADIUS_CLICK_STEP = 1.2;
+const SPHERE_RADIUS_HOLD_RATE = 8.0;
 
 const COLOR_FLOW_INTERVAL = 1.4;
 
@@ -266,22 +270,18 @@ async function main() {
     colorFlowTimer = 0;
   };
 
-  // Esfera: expandir/comprimir el radio objetivo. La propia fuerza
-  // de corrección de la Esfera lleva las partículas hasta el nuevo
-  // radio de forma fluida, sin necesitar nada más aquí.
-  const expandSphere = () => {
-    params.baseRadius.value = Math.min(
-      SPHERE_RADIUS_MAX,
-      params.baseRadius.value + SPHERE_RADIUS_STEP
+  // Esfera: expandir/comprimir. Usado tanto por los botones del
+  // panel (salto discreto al hacer click) como por +/- del teclado
+  // (continuo, mientras se mantienen presionadas — ver el loop).
+  const adjustSphereRadius = (amount) => {
+    params.baseRadius.value = Math.max(
+      SPHERE_RADIUS_MIN,
+      Math.min(SPHERE_RADIUS_MAX, params.baseRadius.value + amount)
     );
   };
 
-  const compressSphere = () => {
-    params.baseRadius.value = Math.max(
-      SPHERE_RADIUS_MIN,
-      params.baseRadius.value - SPHERE_RADIUS_STEP
-    );
-  };
+  const expandSphere = () => adjustSphereRadius(SPHERE_RADIUS_CLICK_STEP);
+  const compressSphere = () => adjustSphereRadius(-SPHERE_RADIUS_CLICK_STEP);
 
   const changeWindSpeed = (amount) => {
     windSpeedTarget = Math.max(
@@ -505,6 +505,16 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
+    // Esfera: mantener +/- la expande/comprime en tiempo real,
+    // igual que Q/W rotan el viento mientras se mantienen.
+    if (heldKeys.has('Equal') || heldKeys.has('NumpadAdd')) {
+      adjustSphereRadius(SPHERE_RADIUS_HOLD_RATE * delta);
+    }
+
+    if (heldKeys.has('Minus') || heldKeys.has('NumpadSubtract')) {
+      adjustSphereRadius(-SPHERE_RADIUS_HOLD_RATE * delta);
+    }
+
     const windDiff = windSpeedTarget - params.windSpeed.value;
 
     if (Math.abs(windDiff) < 0.02) {
@@ -537,7 +547,6 @@ async function main() {
       params.pointerDragAmount.value += dragDiff * Math.min(1, delta * 7);
     }
 
-    // Colores fluyendo solos, si está activado.
     if (colorFlowEnabled) {
       colorFlowTimer += delta;
 
