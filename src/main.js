@@ -8,6 +8,7 @@ import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 131072;
 const WIND_ROTATE_SPEED = 2.4;
+const SPHERE_ROTATE_SPEED = 1.8;
 const WIND_SPEED_MIN = 0;
 const WIND_SPEED_MAX = 25;
 const RIPPLE_DURATION = 1.0;
@@ -336,6 +337,7 @@ async function main() {
     params.baseRadius.value = SPHERE_RADIUS_DEFAULT;
     params.circleRadius.value = CIRCLE_RADIUS_DEFAULT;
     params.sphereShape.value = 0;
+    params.sphereRotation.value = 0.0;
 
     colorFlowEnabled = false;
     colorFlowTimer = 0;
@@ -520,6 +522,14 @@ async function main() {
 
     if (heldKeys.has('KeyW')) {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
+    }
+
+        if (heldKeys.has('KeyJ')) {
+      params.sphereRotation.value -= SPHERE_ROTATE_SPEED * delta;
+    }
+
+    if (heldKeys.has('KeyK')) {
+      params.sphereRotation.value += SPHERE_ROTATE_SPEED * delta;
     }
 
     if (heldKeys.has('Equal') || heldKeys.has('NumpadAdd')) {
