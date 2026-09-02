@@ -9,8 +9,8 @@ html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 
 body {
   background: #050607;
-  /* Cursor personalizado: círculo hueco semi-transparente, como el
-     guía de PERFORMANCE en modo Puntero. */
+  /* Cursor personalizado: círculo hueco semi-transparente, visible
+     en LAB y en PERFORMANCE, en todos los modos. */
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="9" fill="none" stroke="white" stroke-opacity="0.55" stroke-width="2"/></svg>') 14 14, auto;
 }
 
@@ -83,9 +83,4 @@ canvas { display: block; width: 100%; height: 100%; }
   opacity: 0;
   pointer-events: none;
   z-index: 9999;
-}
-
-body.performance-mode,
-body.performance-mode * {
-  cursor: none !important;
 }
