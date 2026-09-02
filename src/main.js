@@ -16,8 +16,6 @@ const CIRCLE_SPRING_STIFFNESS = 70;
 const CIRCLE_SPRING_DAMPING = 6;
 const CIRCLE_KICK_IMPULSE = 16;
 
-// Rango de radio compartido por Esfera y Círculo — el botón/tecla
-// +/- decide a cuál de los dos afecta según el modo activo.
 const RADIUS_MIN = 0.15;
 const RADIUS_MAX = 20.0;
 const RADIUS_CLICK_STEP = 1.2;
@@ -27,6 +25,9 @@ const SPHERE_RADIUS_DEFAULT = 3.0;
 const CIRCLE_RADIUS_DEFAULT = 4.0;
 
 const COLOR_FLOW_INTERVAL = 1.4;
+const CIRCLE_LINE_SPEED = 4.0;
+
+const SPHERE_SHAPE_COUNT = 4; // esfera, diamante, cubo, pirámide
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -271,9 +272,6 @@ async function main() {
     colorFlowTimer = 0;
   };
 
-  // Expandir/comprimir: afecta baseRadius (Esfera) o circleRadius
-  // (Círculo) según el modo activo. En cualquier otro modo, no hace
-  // nada — el mismo botón/tecla sirve para ambas formas.
   const adjustRadius = (amount) => {
     if (params.mode.value === 1) {
       params.baseRadius.value = Math.max(
@@ -290,6 +288,29 @@ async function main() {
 
   const expandRadius = () => adjustRadius(RADIUS_CLICK_STEP);
   const compressRadius = () => adjustRadius(-RADIUS_CLICK_STEP);
+
+  // Esfera: cicla la forma (H). Solo tiene efecto si estás en Esfera.
+  const cycleSphereShape = () => {
+    if (params.mode.value !== 1) return;
+    params.sphereShape.value = (params.sphereShape.value + 1) % SPHERE_SHAPE_COUNT;
+  };
+
+  // Círculo: líneas radiales (I) y su dirección (G).
+  const toggleCircleLines = () => {
+    params.circleLinesEnabled.value =
+      params.circleLinesEnabled.value > 0.5 ? 0 : 1;
+  };
+
+  const flipCircleLineDirection = () => {
+    params.circleLinesDirection.value =
+      params.circleLinesDirection.value > 0 ? -1 : 1;
+  };
+
+  // Círculo: mandala (M).
+  const toggleMandala = () => {
+    params.mandalaEnabled.value =
+      params.mandalaEnabled.value > 0.5 ? 0 : 1;
+  };
 
   const changeWindSpeed = (amount) => {
     windSpeedTarget = Math.max(
@@ -333,6 +354,12 @@ async function main() {
 
     params.baseRadius.value = SPHERE_RADIUS_DEFAULT;
     params.circleRadius.value = CIRCLE_RADIUS_DEFAULT;
+    params.sphereShape.value = 0;
+
+    params.circleLinesEnabled.value = 0;
+    params.circleLinesDirection.value = 1;
+    params.circleLinePhase.value = 0;
+    params.mandalaEnabled.value = 0;
 
     colorFlowEnabled = false;
     colorFlowTimer = 0;
@@ -376,6 +403,10 @@ async function main() {
     onColorFlowToggle: toggleColorFlow,
     onExpandRadius: expandRadius,
     onCompressRadius: compressRadius,
+    onCycleSphereShape: cycleSphereShape,
+    onToggleCircleLines: toggleCircleLines,
+    onFlipCircleLineDirection: flipCircleLineDirection,
+    onToggleMandala: toggleMandala,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onCrazy: triggerCrazy,
@@ -445,6 +476,22 @@ async function main() {
 
       case 'KeyT':
         toggleSlow();
+        break;
+
+      case 'KeyH':
+        cycleSphereShape();
+        break;
+
+      case 'KeyI':
+        toggleCircleLines();
+        break;
+
+      case 'KeyG':
+        flipCircleLineDirection();
+        break;
+
+      case 'KeyM':
+        toggleMandala();
         break;
 
       case 'Digit1':
@@ -520,6 +567,13 @@ async function main() {
 
     if (heldKeys.has('Minus') || heldKeys.has('NumpadSubtract')) {
       adjustRadius(-RADIUS_HOLD_RATE * delta);
+    }
+
+    // Fase de las líneas radiales del Círculo: avanza mientras estén
+    // activas, en la dirección elegida (afuera/adentro).
+    if (params.circleLinesEnabled.value > 0.5) {
+      params.circleLinePhase.value +=
+        params.circleLinesDirection.value * CIRCLE_LINE_SPEED * delta;
     }
 
     const windDiff = windSpeedTarget - params.windSpeed.value;
