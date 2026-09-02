@@ -55,6 +55,9 @@ export function createLabPanel({
   onRipple,
   onFlash,
   onColor,
+  onColorFlowToggle,
+  onExpandSphere,
+  onCompressSphere,
   onSlow,
   onStatic,
   onCrazy,
@@ -86,10 +89,15 @@ export function createLabPanel({
     [4, '5 · Neutro']
   ].forEach(([id, label]) => button(modes, label, () => onModeSelect(id)));
 
+  const sphere = section(panel, 'Esfera');
+  button(sphere, 'Expandir +', onExpandSphere);
+  button(sphere, 'Comprimir −', onCompressSphere);
+
   const effects = section(panel, 'Efectos');
   button(effects, 'Kick / Bounce (B)', onBeat);
   button(effects, 'Onda / Click izquierdo', onRipple);
   button(effects, 'Color (C)', onColor);
+  button(effects, 'Fluir colores (V)', onColorFlowToggle);
   button(effects, 'Flash (F)', onFlash);
   button(effects, 'Slow motion (T)', onSlow);
   button(effects, 'Estática (N)', onStatic);
@@ -111,7 +119,7 @@ export function createLabPanel({
 
   const sim = section(panel, 'Simulación');
   rangeRow(sim, 'timeScale', () => params.timeScale.value, 0, 2, 0.01, (v) => { params.timeScale.value = v; });
-  rangeRow(sim, 'maxSpeed', () => params.maxSpeed.value, 1, 30, 0.5, (v) => { params.maxSpeed.value = v; });
+  rangeRow(sim, 'maxSpeed', () => params.maxSpeed.value, 1, 60, 0.5, (v) => { params.maxSpeed.value = v; });
   rangeRow(sim, 'particleSize', () => params.particleSize.value, 0.005, 0.1, 0.001, (v) => { params.particleSize.value = v; });
 
   const forces = section(panel, 'Fuerzas');
