@@ -31,16 +31,6 @@ export function createParameters() {
     // ESFERA: forma
     sphereShape: uniform(0.0),
 
-    // CÍRCULO: brazos radiales (I) + dirección (G) + reloj interno
-    // que nunca se detiene (por eso los brazos se mueven sin Kick).
-    circleLinesEnabled: uniform(0.0),
-    circleLinesDirection: uniform(1.0),
-    circleLinePhase: uniform(0.0),
-    filamentTime: uniform(0.0),
-
-    // CÍRCULO: mandala hexagonal (M)
-    mandalaEnabled: uniform(0.0),
-
     // FUERZA RADIAL
     radialEnabled: uniform(0.0),
     radialStrength: uniform(0.0),
