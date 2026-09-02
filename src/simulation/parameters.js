@@ -28,6 +28,17 @@ export function createParameters() {
     circleExpansion: uniform(0.0),
     beatExpansion: uniform(0.8),
 
+    // ESFERA: forma — 0 esfera, 1 diamante, 2 cubo, 3 pirámide
+    sphereShape: uniform(0.0),
+
+    // CÍRCULO: líneas radiales fluyendo (I) + dirección (G)
+    circleLinesEnabled: uniform(0.0),
+    circleLinesDirection: uniform(1.0),
+    circleLinePhase: uniform(0.0),
+
+    // CÍRCULO: mandala hexagonal (M)
+    mandalaEnabled: uniform(0.0),
+
     // FUERZA RADIAL
     radialEnabled: uniform(0.0),
     radialStrength: uniform(0.0),
