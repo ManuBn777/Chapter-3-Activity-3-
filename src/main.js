@@ -496,7 +496,7 @@ async function main() {
     if (Math.abs(dragDiff) < 0.01) {
       params.pointerDragAmount.value = pointerDragTarget;
     } else {
-      params.pointerDragAmount.value += dragDiff * Math.min(1, delta * 3);
+      params.pointerDragAmount.value += dragDiff * Math.min(1, delta * 7);
     }
 
     ripples.forEach((r) => {
