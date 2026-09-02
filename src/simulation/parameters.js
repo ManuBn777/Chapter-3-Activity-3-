@@ -6,7 +6,7 @@ export function createParameters() {
     // TIEMPO
     dt: uniform(1.0 / 60.0),
     timeScale: uniform(1.0),
-    maxSpeed: uniform(42.0),
+    maxSpeed: uniform(60.0),
 
     // ESTADO
     activated: uniform(0.0),
