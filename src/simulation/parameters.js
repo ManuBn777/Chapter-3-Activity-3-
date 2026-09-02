@@ -16,10 +16,11 @@ export function createParameters() {
 
     // ATRACTOR / PUNTERO
     attractor: uniform(new Vector3(0, 0, 0)),
-    // Radio de órbita más generoso + variación por partícula, para
-    // que se vea como un enjambre con volumen, no un punto comprimido.
     pointerOrbitRadius: uniform(1.0),
     pointerOrbitVariance: uniform(0.6),
+    // 0 = modo normal (arrastre rápido), 1 = mantenido con click:
+    // nube pesada tipo humo/tinta. Se suaviza en JS, no es un salto.
+    pointerDragAmount: uniform(0.0),
 
     // MODOS
     mode: uniform(0.0),
