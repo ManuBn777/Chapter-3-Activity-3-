@@ -359,6 +359,7 @@ async function main() {
     params.circleLinesEnabled.value = 0;
     params.circleLinesDirection.value = 1;
     params.circleLinePhase.value = 0;
+    params.filamentTime.value = 0.0;
     params.mandalaEnabled.value = 0;
 
     colorFlowEnabled = false;
