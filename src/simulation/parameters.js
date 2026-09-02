@@ -28,13 +28,15 @@ export function createParameters() {
     circleExpansion: uniform(0.0),
     beatExpansion: uniform(0.8),
 
-    // ESFERA: forma — 0 esfera, 1 diamante, 2 cubo, 3 pirámide
+    // ESFERA: forma
     sphereShape: uniform(0.0),
 
-    // CÍRCULO: líneas radiales fluyendo (I) + dirección (G)
+    // CÍRCULO: brazos radiales (I) + dirección (G) + reloj interno
+    // que nunca se detiene (por eso los brazos se mueven sin Kick).
     circleLinesEnabled: uniform(0.0),
     circleLinesDirection: uniform(1.0),
     circleLinePhase: uniform(0.0),
+    filamentTime: uniform(0.0),
 
     // CÍRCULO: mandala hexagonal (M)
     mandalaEnabled: uniform(0.0),
