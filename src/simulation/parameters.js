@@ -28,8 +28,9 @@ export function createParameters() {
     circleExpansion: uniform(0.0),
     beatExpansion: uniform(0.8),
 
-    // ESFERA: forma
+    // ESFERA: forma + rotación (J/K)
     sphereShape: uniform(0.0),
+    sphereRotation: uniform(0.0),
 
     // FUERZA RADIAL
     radialEnabled: uniform(0.0),
