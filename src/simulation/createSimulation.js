@@ -171,7 +171,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         v.z.assign(v.z.mul(0.05));
       });
 
-      // =====================================================
+// =====================================================
       // PUNTERO — estela orgánica con "pereza" por partícula
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
@@ -196,18 +196,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           distance.sub(targetRadius);
 
         const radial =
-          direction.mul(radiusError.mul(6.0));
+          direction.mul(radiusError.mul(10.0));
 
         const orbit =
           vec3(0.0, 0.0, 1.0)
             .cross(direction)
-            .mul(8.0);
+            .mul(10.0);
 
         const personalPhase =
           hash(instanceIndex.add(uint(613)));
 
         const followStrength =
-          mix(0.32, 0.035, personalPhase);
+          mix(0.6, 0.15, personalPhase);
 
         v.assign(
           mix(
