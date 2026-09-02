@@ -12,9 +12,6 @@ const WIND_SPEED_MIN = 0;
 const WIND_SPEED_MAX = 25;
 const RIPPLE_DURATION = 1.0;
 
-// Resorte del Círculo: rigidez y amortiguación. Con estos valores
-// oscila un par de veces (efecto "membrana") antes de asentarse en
-// menos de un segundo.
 const CIRCLE_SPRING_STIFFNESS = 70;
 const CIRCLE_SPRING_DAMPING = 6;
 const CIRCLE_KICK_IMPULSE = 16;
@@ -111,6 +108,9 @@ async function main() {
   let circleExpansion = 0;
   let circleExpansionVelocity = 0;
 
+  // Nube de arrastre del Puntero (mantener click, solo en Puntero).
+  let pointerDragTarget = 0;
+
   const heldKeys = new Set();
 
   const pointerNdc = new THREE.Vector2();
@@ -167,6 +167,12 @@ async function main() {
   addEventListener('pointerdown', (event) => {
     if (event.button === 0) {
       triggerRipple();
+
+      // Mantener click en Puntero (y SOLO en Puntero) activa la
+      // nube pesada tipo humo/tinta.
+      if (params.mode.value === 3) {
+        pointerDragTarget = 1;
+      }
     }
 
     if (event.button === 2) {
@@ -176,6 +182,10 @@ async function main() {
   });
 
   addEventListener('pointerup', (event) => {
+    if (event.button === 0) {
+      pointerDragTarget = 0;
+    }
+
     if (event.button === 2) {
       compressionHeld = false;
       params.releaseBurst.value = 1.0;
@@ -184,6 +194,7 @@ async function main() {
 
   addEventListener('pointercancel', () => {
     compressionHeld = false;
+    pointerDragTarget = 0;
   });
 
   const setUiMode = (next) => {
@@ -207,6 +218,10 @@ async function main() {
     attractorHelper.visible = uiMode === 'LAB' && next === 3;
     performanceGuide.visible = uiMode === 'PERFORMANCE' && next === 3;
 
+    if (next !== 3) {
+      pointerDragTarget = 0;
+    }
+
     if (next === 0 || next === 4) {
       params.staticTrigger.value = Math.max(params.staticTrigger.value, 2.0);
     }
@@ -214,10 +229,6 @@ async function main() {
 
   const triggerBeat = () => {
     params.beat.value = 1.0;
-
-    // Un pulso manual, exacto, cada vez que se presiona — el
-    // resorte del Círculo lo recibe como un impulso de velocidad,
-    // no como un valor fijo, así que el rebote es siempre orgánico.
     circleExpansionVelocity += CIRCLE_KICK_IMPULSE;
   };
 
@@ -268,7 +279,7 @@ async function main() {
 
   const reset = () => {
     params.timeScale.value = 1.0;
-    params.maxSpeed.value = 30.0;
+    params.maxSpeed.value = 60.0;
 
     windSpeedTarget = 0;
     params.windSpeed.value = 0.0;
@@ -280,6 +291,9 @@ async function main() {
     circleExpansion = 0;
     circleExpansionVelocity = 0;
     params.circleExpansion.value = 0.0;
+
+    pointerDragTarget = 0;
+    params.pointerDragAmount.value = 0.0;
 
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
@@ -467,10 +481,7 @@ async function main() {
       params.slowMotion.value += slowDiff * Math.min(1, delta * 6);
     }
 
-    // Física del resorte del Círculo: masa-resorte-amortiguador.
-    // El impulso de cada Kick le da velocidad; la rigidez lo jala
-    // de vuelta al centro (expansión 0) y la amortiguación evita
-    // que oscile para siempre — así se asienta solo, elásticamente.
+    // Física del resorte del Círculo.
     const springAccel =
       -CIRCLE_SPRING_STIFFNESS * circleExpansion -
       CIRCLE_SPRING_DAMPING * circleExpansionVelocity;
@@ -478,6 +489,15 @@ async function main() {
     circleExpansionVelocity += springAccel * delta;
     circleExpansion += circleExpansionVelocity * delta;
     params.circleExpansion.value = circleExpansion;
+
+    // Rampa suave hacia/desde la nube de arrastre del Puntero.
+    const dragDiff = pointerDragTarget - params.pointerDragAmount.value;
+
+    if (Math.abs(dragDiff) < 0.01) {
+      params.pointerDragAmount.value = pointerDragTarget;
+    } else {
+      params.pointerDragAmount.value += dragDiff * Math.min(1, delta * 3);
+    }
 
     ripples.forEach((r) => {
       if (r.life.value > 0) {
