@@ -16,14 +16,15 @@ const CIRCLE_SPRING_STIFFNESS = 70;
 const CIRCLE_SPRING_DAMPING = 6;
 const CIRCLE_KICK_IMPULSE = 16;
 
-// Esfera: rango amplio a propósito — desde casi un punto comprimido
-// hasta un radio tan grande que la cámara (a 11 unidades del centro)
-// termina literalmente dentro de la esfera.
-const SPHERE_RADIUS_MIN = 0.15;
-const SPHERE_RADIUS_MAX = 20.0;
+// Rango de radio compartido por Esfera y Círculo — el botón/tecla
+// +/- decide a cuál de los dos afecta según el modo activo.
+const RADIUS_MIN = 0.15;
+const RADIUS_MAX = 20.0;
+const RADIUS_CLICK_STEP = 1.2;
+const RADIUS_HOLD_RATE = 8.0;
+
 const SPHERE_RADIUS_DEFAULT = 3.0;
-const SPHERE_RADIUS_CLICK_STEP = 1.2;
-const SPHERE_RADIUS_HOLD_RATE = 8.0;
+const CIRCLE_RADIUS_DEFAULT = 4.0;
 
 const COLOR_FLOW_INTERVAL = 1.4;
 
@@ -270,18 +271,25 @@ async function main() {
     colorFlowTimer = 0;
   };
 
-  // Esfera: expandir/comprimir. Usado tanto por los botones del
-  // panel (salto discreto al hacer click) como por +/- del teclado
-  // (continuo, mientras se mantienen presionadas — ver el loop).
-  const adjustSphereRadius = (amount) => {
-    params.baseRadius.value = Math.max(
-      SPHERE_RADIUS_MIN,
-      Math.min(SPHERE_RADIUS_MAX, params.baseRadius.value + amount)
-    );
+  // Expandir/comprimir: afecta baseRadius (Esfera) o circleRadius
+  // (Círculo) según el modo activo. En cualquier otro modo, no hace
+  // nada — el mismo botón/tecla sirve para ambas formas.
+  const adjustRadius = (amount) => {
+    if (params.mode.value === 1) {
+      params.baseRadius.value = Math.max(
+        RADIUS_MIN,
+        Math.min(RADIUS_MAX, params.baseRadius.value + amount)
+      );
+    } else if (params.mode.value === 2) {
+      params.circleRadius.value = Math.max(
+        RADIUS_MIN,
+        Math.min(RADIUS_MAX, params.circleRadius.value + amount)
+      );
+    }
   };
 
-  const expandSphere = () => adjustSphereRadius(SPHERE_RADIUS_CLICK_STEP);
-  const compressSphere = () => adjustSphereRadius(-SPHERE_RADIUS_CLICK_STEP);
+  const expandRadius = () => adjustRadius(RADIUS_CLICK_STEP);
+  const compressRadius = () => adjustRadius(-RADIUS_CLICK_STEP);
 
   const changeWindSpeed = (amount) => {
     windSpeedTarget = Math.max(
@@ -324,6 +332,7 @@ async function main() {
     params.pointerDragAmount.value = 0.0;
 
     params.baseRadius.value = SPHERE_RADIUS_DEFAULT;
+    params.circleRadius.value = CIRCLE_RADIUS_DEFAULT;
 
     colorFlowEnabled = false;
     colorFlowTimer = 0;
@@ -365,8 +374,8 @@ async function main() {
     onFlash: triggerFlash,
     onColor: cycleColor,
     onColorFlowToggle: toggleColorFlow,
-    onExpandSphere: expandSphere,
-    onCompressSphere: compressSphere,
+    onExpandRadius: expandRadius,
+    onCompressRadius: compressRadius,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onCrazy: triggerCrazy,
@@ -505,14 +514,12 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
-    // Esfera: mantener +/- la expande/comprime en tiempo real,
-    // igual que Q/W rotan el viento mientras se mantienen.
     if (heldKeys.has('Equal') || heldKeys.has('NumpadAdd')) {
-      adjustSphereRadius(SPHERE_RADIUS_HOLD_RATE * delta);
+      adjustRadius(RADIUS_HOLD_RATE * delta);
     }
 
     if (heldKeys.has('Minus') || heldKeys.has('NumpadSubtract')) {
-      adjustSphereRadius(-SPHERE_RADIUS_HOLD_RATE * delta);
+      adjustRadius(-RADIUS_HOLD_RATE * delta);
     }
 
     const windDiff = windSpeedTarget - params.windSpeed.value;
