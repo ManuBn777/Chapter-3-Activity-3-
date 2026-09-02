@@ -16,10 +16,8 @@ export function createParameters() {
 
     // ATRACTOR / PUNTERO
     attractor: uniform(new Vector3(0, 0, 0)),
-    pointerOrbitRadius: uniform(1.0),
-    pointerOrbitVariance: uniform(0.6),
-    // 0 = modo normal (arrastre rápido), 1 = mantenido con click:
-    // nube pesada tipo humo/tinta. Se suaviza en JS, no es un salto.
+    pointerOrbitRadius: uniform(2.2),
+    pointerOrbitVariance: uniform(1.3),
     pointerDragAmount: uniform(0.0),
 
     // MODOS
