@@ -16,6 +16,13 @@ const CIRCLE_SPRING_STIFFNESS = 70;
 const CIRCLE_SPRING_DAMPING = 6;
 const CIRCLE_KICK_IMPULSE = 16;
 
+const SPHERE_RADIUS_MIN = 1.0;
+const SPHERE_RADIUS_MAX = 8.0;
+const SPHERE_RADIUS_DEFAULT = 3.0;
+const SPHERE_RADIUS_STEP = 0.6;
+
+const COLOR_FLOW_INTERVAL = 1.4;
+
 async function main() {
   const mount = document.querySelector('#app');
 
@@ -104,12 +111,13 @@ async function main() {
   let slowMotionTarget = 0;
   let hasSpread = false;
 
-  // Estado del resorte del Círculo.
   let circleExpansion = 0;
   let circleExpansionVelocity = 0;
 
-  // Nube de arrastre del Puntero (mantener click, solo en Puntero).
   let pointerDragTarget = 0;
+
+  let colorFlowEnabled = false;
+  let colorFlowTimer = 0;
 
   const heldKeys = new Set();
 
@@ -168,8 +176,6 @@ async function main() {
     if (event.button === 0) {
       triggerRipple();
 
-      // Mantener click en Puntero (y SOLO en Puntero) activa la
-      // nube pesada tipo humo/tinta.
       if (params.mode.value === 3) {
         pointerDragTarget = 1;
       }
@@ -255,6 +261,28 @@ async function main() {
     params.colorTransition.value = 0.0;
   };
 
+  const toggleColorFlow = () => {
+    colorFlowEnabled = !colorFlowEnabled;
+    colorFlowTimer = 0;
+  };
+
+  // Esfera: expandir/comprimir el radio objetivo. La propia fuerza
+  // de corrección de la Esfera lleva las partículas hasta el nuevo
+  // radio de forma fluida, sin necesitar nada más aquí.
+  const expandSphere = () => {
+    params.baseRadius.value = Math.min(
+      SPHERE_RADIUS_MAX,
+      params.baseRadius.value + SPHERE_RADIUS_STEP
+    );
+  };
+
+  const compressSphere = () => {
+    params.baseRadius.value = Math.max(
+      SPHERE_RADIUS_MIN,
+      params.baseRadius.value - SPHERE_RADIUS_STEP
+    );
+  };
+
   const changeWindSpeed = (amount) => {
     windSpeedTarget = Math.max(
       WIND_SPEED_MIN,
@@ -295,6 +323,11 @@ async function main() {
     pointerDragTarget = 0;
     params.pointerDragAmount.value = 0.0;
 
+    params.baseRadius.value = SPHERE_RADIUS_DEFAULT;
+
+    colorFlowEnabled = false;
+    colorFlowTimer = 0;
+
     params.radialEnabled.value = 0.0;
     params.vortexEnabled.value = 0.0;
     params.crazyEnabled.value = 0.0;
@@ -331,6 +364,9 @@ async function main() {
     onRipple: triggerRipple,
     onFlash: triggerFlash,
     onColor: cycleColor,
+    onColorFlowToggle: toggleColorFlow,
+    onExpandSphere: expandSphere,
+    onCompressSphere: compressSphere,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onCrazy: triggerCrazy,
@@ -388,6 +424,10 @@ async function main() {
 
       case 'KeyC':
         cycleColor();
+        break;
+
+      case 'KeyV':
+        toggleColorFlow();
         break;
 
       case 'KeyF':
@@ -481,7 +521,6 @@ async function main() {
       params.slowMotion.value += slowDiff * Math.min(1, delta * 6);
     }
 
-    // Física del resorte del Círculo.
     const springAccel =
       -CIRCLE_SPRING_STIFFNESS * circleExpansion -
       CIRCLE_SPRING_DAMPING * circleExpansionVelocity;
@@ -490,13 +529,22 @@ async function main() {
     circleExpansion += circleExpansionVelocity * delta;
     params.circleExpansion.value = circleExpansion;
 
-    // Rampa suave hacia/desde la nube de arrastre del Puntero.
     const dragDiff = pointerDragTarget - params.pointerDragAmount.value;
 
     if (Math.abs(dragDiff) < 0.01) {
       params.pointerDragAmount.value = pointerDragTarget;
     } else {
       params.pointerDragAmount.value += dragDiff * Math.min(1, delta * 7);
+    }
+
+    // Colores fluyendo solos, si está activado.
+    if (colorFlowEnabled) {
+      colorFlowTimer += delta;
+
+      if (colorFlowTimer >= COLOR_FLOW_INTERVAL) {
+        colorFlowTimer -= COLOR_FLOW_INTERVAL;
+        cycleColor();
+      }
     }
 
     ripples.forEach((r) => {
