@@ -58,6 +58,10 @@ export function createLabPanel({
   onColorFlowToggle,
   onExpandRadius,
   onCompressRadius,
+  onCycleSphereShape,
+  onToggleCircleLines,
+  onFlipCircleLineDirection,
+  onToggleMandala,
   onSlow,
   onStatic,
   onCrazy,
@@ -92,6 +96,12 @@ export function createLabPanel({
   const radius = section(panel, 'Esfera / Círculo · +/-');
   button(radius, 'Expandir +', onExpandRadius);
   button(radius, 'Comprimir −', onCompressRadius);
+  button(radius, 'Forma Esfera (H)', onCycleSphereShape);
+
+  const circleExtra = section(panel, 'Círculo · extras');
+  button(circleExtra, 'Líneas radiales (I)', onToggleCircleLines);
+  button(circleExtra, 'Dirección líneas (G)', onFlipCircleLineDirection);
+  button(circleExtra, 'Mandala (M)', onToggleMandala);
 
   const effects = section(panel, 'Efectos');
   button(effects, 'Kick / Bounce (B)', onBeat);
