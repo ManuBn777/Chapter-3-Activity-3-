@@ -577,6 +577,8 @@ async function main() {
         params.circleLinesDirection.value * CIRCLE_LINE_SPEED * delta;
     }
 
+    params.filamentTime.value += delta;
+
     const windDiff = windSpeedTarget - params.windSpeed.value;
 
     if (Math.abs(windDiff) < 0.02) {
