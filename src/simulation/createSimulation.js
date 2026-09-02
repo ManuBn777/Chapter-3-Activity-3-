@@ -94,12 +94,38 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // ESFERA
+      // ESFERA — con selector de forma (sphereShape):
+      // 0 esfera, 1 diamante (L1), 2 cubo (L∞), 3 pirámide (aprox.)
       // =====================================================
       If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
-        const radius = max(p.length(), 0.001);
-        const normal = p.div(radius);
-        const radiusError = radius.sub(params.baseRadius);
+        const euclidLen = max(p.length(), 0.001);
+        const normal = p.div(euclidLen);
+
+        const cubeDist = max(max(p.x.abs(), p.y.abs()), p.z.abs());
+        const diamondDist = p.x.abs().add(p.y.abs()).add(p.z.abs());
+
+        // Pirámide: la sección cuadrada se angosta hacia arriba (+z)
+        // hasta un punto, y es ancha en la base (-z). Aproximación
+        // estilizada, no un sólido geométrico exacto.
+        const heightTRaw =
+          p.z.add(params.baseRadius).div(params.baseRadius.mul(2.0));
+
+        const heightT =
+          max(heightTRaw, 0.0).oneMinus().max(0.0).oneMinus();
+
+        const squareDist = max(p.x.abs(), p.y.abs());
+
+        const pyramidDist = max(
+          squareDist.div(max(heightT.oneMinus(), 0.08)),
+          p.z.abs()
+        );
+
+        const s = params.sphereShape;
+        const d01 = mix(euclidLen, diamondDist, step(0.5, s));
+        const d12 = mix(d01, cubeDist, step(1.5, s));
+        const shapeDist = mix(d12, pyramidDist, step(2.5, s));
+
+        const radiusError = shapeDist.sub(params.baseRadius);
 
         const radialCorrection =
           normal
@@ -129,7 +155,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // CÍRCULO
+      // CÍRCULO — anillo/resorte + líneas radiales (I/G) +
+      // mandala hexagonal (M), ambos opcionales y combinables.
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -161,12 +188,49 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         );
 
         v.z.assign(v.z.mul(0.05));
+
+        // --- Líneas radiales fluyendo (I activa, G cambia dirección) ---
+        If(params.circleLinesEnabled.greaterThan(0.5), () => {
+          const wave =
+            sin(radius.mul(2.2).sub(params.circleLinePhase));
+
+          v.addAssign(
+            radial
+              .mul(wave)
+              .mul(7.0)
+              .mul(dt)
+          );
+        });
+
+        // --- Mandala hexagonal (M) — simetría de 6 pliegues sin
+        // necesitar ángulo explícito, vía fórmulas de multi-ángulo
+        // sobre radial.x/radial.y (cos/sin del ángulo real). ---
+        If(params.mandalaEnabled.greaterThan(0.5), () => {
+          const c1 = radial.x;
+          const s1 = radial.y;
+          const c2 = c1.mul(c1).sub(s1.mul(s1));
+          const s2 = c1.mul(s1).mul(2.0);
+          const c3 = c1.mul(c2).sub(s1.mul(s2));
+          const s3 = s1.mul(c2).add(c1.mul(s2));
+          const c6 = c3.mul(c3).sub(s3.mul(s3));
+
+          const mandalaRadius =
+            effectiveRadius.add(c6.mul(1.1));
+
+          const mandalaError =
+            mandalaRadius.sub(radius);
+
+          v.addAssign(
+            radial
+              .mul(mandalaError)
+              .mul(10.0)
+              .mul(dt)
+          );
+        });
       });
 
       // =====================================================
-      // PUNTERO — normal (arrastre) o, manteniendo click, nube
-      // pesada tipo humo/tinta. El Kick se mete DENTRO del
-      // objetivo perseguido, para que no se lo coma el follow.
+      // PUNTERO
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -181,7 +245,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const personalPhase =
           hash(instanceIndex.add(uint(613)));
 
-        // --- Comportamiento NORMAL (sin mantener click) ---
         const radiusVariance =
           hash(instanceIndex.add(uint(509)))
             .sub(0.5)
@@ -204,7 +267,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const normalFollow =
           mix(0.85, 0.45, personalPhase);
 
-        // --- Comportamiento ARRASTRADO (manteniendo click) ---
         const personalOffset = vec3(
           hash(instanceIndex.add(uint(701))).sub(0.5),
           hash(instanceIndex.add(uint(811))).sub(0.5),
@@ -234,7 +296,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const dragFollow =
           mix(0.6, 0.3, personalPhase);
 
-        // --- Kick, metido en el objetivo (no encima de v directo) ---
         const kickOutward =
           direction
             .negate()
@@ -242,7 +303,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             .mul(params.beatStrength)
             .mul(35.0);
 
-        // --- Mezcla entre normal y arrastrado ---
         const blendedVelocity = mix(
           normalRadial.add(normalOrbit).add(kickOutward),
           dragPull.add(dragOrbit).add(kickOutward),
@@ -280,8 +340,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // KICK (B) — universal (excepto Puntero, que ya lo mete
-      // dentro de su propio objetivo arriba)
+      // KICK (B) — universal excepto Puntero (que lo mete
+      // dentro de su propio objetivo, arriba)
       // =====================================================
       If(params.mode.lessThan(2.5).or(params.mode.greaterThan(3.5)), () => {
         If(params.beat.greaterThan(0.01), () => {
@@ -296,9 +356,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           );
         });
       });
-
-      // El Círculo usa su propio resorte (circleExpansion, ver
-      // main.js) en vez de este empuje genérico.
 
       // =====================================================
       // ONDAS (click izquierdo)
