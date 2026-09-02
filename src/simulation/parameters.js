@@ -18,8 +18,8 @@ export function createParameters() {
     attractor: uniform(new Vector3(0, 0, 0)),
     // Radio de órbita más generoso + variación por partícula, para
     // que se vea como un enjambre con volumen, no un punto comprimido.
-    pointerOrbitRadius: uniform(3.2),
-    pointerOrbitVariance: uniform(1.4),
+    pointerOrbitRadius: uniform(1.0),
+    pointerOrbitVariance: uniform(0.6),
 
     // MODOS
     mode: uniform(0.0),
