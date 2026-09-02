@@ -170,11 +170,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
         v.z.assign(v.z.mul(0.05));
       });
-      
+
       // =====================================================
-      // PUNTERO — dos comportamientos mezclados según
-      // pointerDragAmount: normal (arrastre rápido) o, al
-      // mantener click, nube pesada tipo humo/tinta con volumen.
+      // PUNTERO — normal (arrastre rápido) o, manteniendo click,
+      // nube pesada tipo humo/tinta con volumen (más grande y
+      // más rápida ahora).
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -213,14 +213,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           mix(0.85, 0.45, personalPhase);
 
         // --- Comportamiento ARRASTRADO (manteniendo click) ---
-        // Cada partícula tiene su propio hueco fijo dentro de una
-        // nube 3D alrededor del puntero — nunca convergen al mismo
-        // punto exacto (aproxima "repulsión" sin calcularla real).
         const personalOffset = vec3(
           hash(instanceIndex.add(uint(701))).sub(0.5),
           hash(instanceIndex.add(uint(811))).sub(0.5),
           hash(instanceIndex.add(uint(919))).sub(0.5)
-        ).mul(1.3);
+        ).mul(2.6);
 
         const dragTargetPos =
           params.attractor.add(personalOffset);
@@ -234,19 +231,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const dragDir =
           toDragTarget.div(dragDist);
 
-        // Atracción proporcional a la distancia (tipo resorte, no
-        // un jalón fijo) — reacciona mucho más lento que el modo
-        // normal, dando esa sensación de masa/humo pesado.
         const dragPull =
-          dragDir.mul(dragDist.mul(2.2));
+          dragDir.mul(dragDist.mul(7.0));
 
         const dragOrbit =
           vec3(0.0, 0.0, 1.0)
             .cross(dragDir)
-            .mul(2.5);
+            .mul(5.5);
 
         const dragFollow =
-          mix(0.16, 0.05, personalPhase);
+          mix(0.6, 0.3, personalPhase);
 
         // --- Mezcla entre ambos según qué tanto se mantiene el click ---
         const blendedVelocity = mix(
@@ -269,6 +263,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           )
         );
       });
+
       // =====================================================
       // NEUTRO — agua calmada, sin viento
       // =====================================================
@@ -366,9 +361,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // GRANO (jitter permanente por partícula) — radialmente
-      // simétrico (usa la distancia al centro, no p.x/p.y/p.z
-      // por separado), así no genera sesgo de ejes/rectangular.
+      // GRANO (jitter permanente por partícula)
       // =====================================================
       const grainPhase = hash(instanceIndex.add(uint(101)));
       const radialPhase = p.length().mul(3.0);
@@ -482,6 +475,20 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       If(params.mode.greaterThan(3.5), () => {
+        const half = params.boundsSize.mul(0.5);
+
+        p.assign(
+          p
+            .add(half)
+            .mod(params.boundsSize)
+            .sub(half)
+        );
+      });
+
+      // =====================================================
+      // PUNTERO WRAP — mismo límite en caja 3D que Arena/Neutro
+      // =====================================================
+      If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const half = params.boundsSize.mul(0.5);
 
         p.assign(
