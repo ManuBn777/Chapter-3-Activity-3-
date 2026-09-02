@@ -1,23 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { Fn, If, color, hash, instanceIndex, instancedArray, max, mix, step, uint, uv, vec3, vec4, sin, cos } from 'three/tsl';
 
-// 7 brazos con longitud propia distinta cada uno (organicidad e
-// irregularidad) — repartidos en ángulos parejos, pero desiguales
-// en tamaño. Bucketize asigna a cada partícula el ángulo/longitud
-// de SU brazo, usando el mismo truco de "cascada de mix + step"
-// que ya usa la paleta de colores (probado, compila sin problema).
-const ARM_COUNT = 7;
-const ARM_ANGLES = Array.from({ length: ARM_COUNT }, (_, i) => (i / ARM_COUNT) * Math.PI * 2);
-const ARM_LENGTHS = [1.0, 0.72, 1.18, 0.85, 1.35, 0.65, 1.05];
-
-function bucketize(seed, values) {
-  let result = values[0];
-  for (let k = 1; k < values.length; k++) {
-    result = mix(result, values[k], step(k / values.length, seed));
-  }
-  return result;
-}
-
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
@@ -168,10 +151,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // CÍRCULO — anillo liso (+ mandala opcional) por defecto;
-      // si circleLinesEnabled=1, se reemplaza por una estructura
-      // de 7 brazos orgánicos que emergen de fuerzas, no de
-      // posiciones fijas — respiran solos por filamentTime.
+      // CÍRCULO — anillo liso, respira con el Kick (resorte)
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -179,94 +159,27 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radial = xy.div(radius);
         const tangent = vec3(radial.y.negate(), radial.x, 0.0);
 
-        // --- Anillo liso (comportamiento cuando I está apagado) ---
         const organicWobble = sin(p.x.mul(3.0).add(p.y.mul(2.0)))
           .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.25));
 
-        const c1 = radial.x;
-        const s1 = radial.y;
-        const c2 = c1.mul(c1).sub(s1.mul(s1));
-        const s2 = c1.mul(s1).mul(2.0);
-        const c3 = c1.mul(c2).sub(s1.mul(s2));
-        const s3 = s1.mul(c2).add(c1.mul(s2));
-        const c6 = c3.mul(c3).sub(s3.mul(s3));
-
-        const mandalaBulge =
-          c6.mul(params.mandalaEnabled).mul(1.6);
-
         const effectiveRadius = params.circleRadius
           .add(params.circleExpansion.mul(2.0))
-          .add(organicWobble.mul(params.circleExpansion).mul(0.55))
-          .add(mandalaBulge);
+          .add(organicWobble.mul(params.circleExpansion).mul(0.55));
 
-        const ringVelocity =
+        const radiusCorrection =
           radial
             .mul(effectiveRadius.sub(radius))
-            .mul(18.0)
-            .add(tangent.mul(5.5));
+            .mul(18.0);
 
-        // --- Brazos orgánicos (comportamiento cuando I está encendido) ---
-        const armSeed = hash(instanceIndex.add(uint(777)));
-        const radialFraction = hash(instanceIndex.add(uint(881)));
-        const personalPhase = hash(instanceIndex.add(uint(953)));
-
-        const baseAngle = bucketize(armSeed, ARM_ANGLES);
-        const armLength = bucketize(armSeed, ARM_LENGTHS);
-
-        // Reparte a cada partícula entre la raíz (15%) y la punta
-        // (100%) del brazo — nunca todas en el mismo punto.
-        const effectiveFraction =
-          radialFraction.mul(0.85).add(0.15);
-
-        // El reloj interno (filamentTime) nunca se detiene, así que
-        // esto oscila solo, sin necesitar Kick. circleLinesDirection
-        // (G) invierte el sentido del "latido".
-        const timePhase =
-          params.filamentTime.mul(params.circleLinesDirection);
-
-        const curveStrength = effectiveFraction.mul(0.8);
-
-        const curveAmount =
-          sin(
-            effectiveFraction.mul(3.0)
-              .add(timePhase.mul(0.5))
-              .add(personalPhase.mul(6.28318))
-          ).mul(curveStrength);
-
-        const targetAngle = baseAngle.add(curveAmount);
-        const targetRadius =
-          params.circleRadius.mul(armLength).mul(effectiveFraction);
-
-        const targetPos = vec3(
-          cos(targetAngle).mul(targetRadius),
-          sin(targetAngle).mul(targetRadius),
-          0.0
-        );
-
-        const toTarget = targetPos.sub(xy);
-        const targetDist = max(toTarget.length(), 0.05);
-        const targetDir = toTarget.div(targetDist);
-
-        const filamentPull =
-          targetDir.mul(targetDist.mul(9.0));
-
-        const filamentWobble =
-          tangent
-            .mul(sin(timePhase.mul(0.7).add(personalPhase.mul(6.28318))))
-            .mul(0.8);
-
-        const filamentVelocity =
-          filamentPull.add(filamentWobble);
-
-        // --- Mezcla entre anillo y brazos, según circleLinesEnabled ---
-        const blendedVelocity = mix(
-          ringVelocity,
-          filamentVelocity,
-          params.circleLinesEnabled
-        );
+        const circleVelocity =
+          tangent.mul(5.5);
 
         v.assign(
-          mix(v, blendedVelocity, 0.24)
+          mix(
+            v,
+            radiusCorrection.add(circleVelocity),
+            0.25
+          )
         );
 
         v.z.assign(v.z.mul(0.05));
