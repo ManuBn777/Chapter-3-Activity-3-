@@ -170,11 +170,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
         v.z.assign(v.z.mul(0.05));
       });
-
-  // =====================================================
-      // PUNTERO — campo de arrastre fuerte: alcanza rápido los
-      // cambios de posición, se queda cerca incluso con
-      // movimientos rápidos del mouse.
+      
+      // =====================================================
+      // PUNTERO — dos comportamientos mezclados según
+      // pointerDragAmount: normal (arrastre rápido) o, al
+      // mantener click, nube pesada tipo humo/tinta con volumen.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -186,6 +186,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const direction =
           toPointer.div(distance);
 
+        const personalPhase =
+          hash(instanceIndex.add(uint(613)));
+
+        // --- Comportamiento NORMAL (sin mantener click) ---
         const radiusVariance =
           hash(instanceIndex.add(uint(509)))
             .sub(0.5)
@@ -197,36 +201,74 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const radiusError =
           distance.sub(targetRadius);
 
-        // Arrastre fuerte: prioriza alcanzar al puntero por
-        // encima de mantener la órbita perfecta.
-        const radial =
+        const normalRadial =
           direction.mul(radiusError.mul(20.0));
 
-        // Órbita más discreta — da la curva orgánica al girar,
-        // sin sumar tanta distancia extra mientras persigue.
-        const orbit =
+        const normalOrbit =
           vec3(0.0, 0.0, 1.0)
             .cross(direction)
             .mul(6.0);
 
-        const personalPhase =
-          hash(instanceIndex.add(uint(613)));
-
-        // Rango de "pereza" más angosto: incluso la partícula
-        // más lenta sigue de cerca, solo con un poco más de
-        // suavidad que la más rápida.
-        const followStrength =
+        const normalFollow =
           mix(0.85, 0.45, personalPhase);
+
+        // --- Comportamiento ARRASTRADO (manteniendo click) ---
+        // Cada partícula tiene su propio hueco fijo dentro de una
+        // nube 3D alrededor del puntero — nunca convergen al mismo
+        // punto exacto (aproxima "repulsión" sin calcularla real).
+        const personalOffset = vec3(
+          hash(instanceIndex.add(uint(701))).sub(0.5),
+          hash(instanceIndex.add(uint(811))).sub(0.5),
+          hash(instanceIndex.add(uint(919))).sub(0.5)
+        ).mul(1.3);
+
+        const dragTargetPos =
+          params.attractor.add(personalOffset);
+
+        const toDragTarget =
+          dragTargetPos.sub(p);
+
+        const dragDist =
+          max(toDragTarget.length(), 0.05);
+
+        const dragDir =
+          toDragTarget.div(dragDist);
+
+        // Atracción proporcional a la distancia (tipo resorte, no
+        // un jalón fijo) — reacciona mucho más lento que el modo
+        // normal, dando esa sensación de masa/humo pesado.
+        const dragPull =
+          dragDir.mul(dragDist.mul(2.2));
+
+        const dragOrbit =
+          vec3(0.0, 0.0, 1.0)
+            .cross(dragDir)
+            .mul(2.5);
+
+        const dragFollow =
+          mix(0.16, 0.05, personalPhase);
+
+        // --- Mezcla entre ambos según qué tanto se mantiene el click ---
+        const blendedVelocity = mix(
+          normalRadial.add(normalOrbit),
+          dragPull.add(dragOrbit),
+          params.pointerDragAmount
+        );
+
+        const blendedFollow = mix(
+          normalFollow,
+          dragFollow,
+          params.pointerDragAmount
+        );
 
         v.assign(
           mix(
             v,
-            radial.add(orbit),
-            followStrength
+            blendedVelocity,
+            blendedFollow
           )
         );
       });
-
       // =====================================================
       // NEUTRO — agua calmada, sin viento
       // =====================================================
