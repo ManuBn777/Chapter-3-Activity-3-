@@ -126,14 +126,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             0.22
           )
         );
-
-        v.addAssign(
-          normal
-            .mul(params.beat)
-            .mul(params.beatStrength)
-            .mul(18.0)
-            .mul(dt)
-        );
       });
 
       // =====================================================
@@ -172,9 +164,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO — normal (arrastre rápido) o, manteniendo click,
-      // nube pesada tipo humo/tinta con volumen (más grande y
-      // más rápida ahora).
+      // PUNTERO — normal (arrastre) o, manteniendo click, nube
+      // pesada tipo humo/tinta. El Kick se mete DENTRO del
+      // objetivo perseguido, para que no se lo coma el follow.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -242,10 +234,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const dragFollow =
           mix(0.6, 0.3, personalPhase);
 
-        // --- Mezcla entre ambos según qué tanto se mantiene el click ---
+        // --- Kick, metido en el objetivo (no encima de v directo) ---
+        const kickOutward =
+          direction
+            .negate()
+            .mul(params.beat)
+            .mul(params.beatStrength)
+            .mul(35.0);
+
+        // --- Mezcla entre normal y arrastrado ---
         const blendedVelocity = mix(
-          normalRadial.add(normalOrbit),
-          dragPull.add(dragOrbit),
+          normalRadial.add(normalOrbit).add(kickOutward),
+          dragPull.add(dragOrbit).add(kickOutward),
           params.pointerDragAmount
         );
 
@@ -280,19 +280,25 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // KICK (B)
+      // KICK (B) — universal (excepto Puntero, que ya lo mete
+      // dentro de su propio objetivo arriba)
       // =====================================================
-      If(params.beat.greaterThan(0.01), () => {
-        const direction = p.normalize();
+      If(params.mode.lessThan(2.5).or(params.mode.greaterThan(3.5)), () => {
+        If(params.beat.greaterThan(0.01), () => {
+          const direction = p.normalize();
 
-        v.addAssign(
-          direction
-            .mul(params.beat)
-            .mul(params.beatStrength)
-            .mul(14.0)
-            .mul(dt)
-        );
+          v.addAssign(
+            direction
+              .mul(params.beat)
+              .mul(params.beatStrength)
+              .mul(40.0)
+              .mul(dt)
+          );
+        });
       });
+
+      // El Círculo usa su propio resorte (circleExpansion, ver
+      // main.js) en vez de este empuje genérico.
 
       // =====================================================
       // ONDAS (click izquierdo)
@@ -486,7 +492,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO WRAP — mismo límite en caja 3D que Arena/Neutro
+      // PUNTERO WRAP
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const half = params.boundsSize.mul(0.5);
