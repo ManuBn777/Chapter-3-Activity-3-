@@ -230,11 +230,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const normalFollow =
           mix(0.85, 0.45, personalPhase);
 
- // --- Comportamiento ARRASTRADO (manteniendo click) ---
+        // --- Comportamiento ARRASTRADO (manteniendo click) ---
         // Dirección aleatoria normalizada (esfera, no cubo) + radio
         // con caída hacia el centro (más denso ahí, como una gota
         // real de tinta/humo).
-        const dragDir = vec3(
+        const dragOffsetDir = vec3(
           hash(instanceIndex.add(uint(701))).sub(0.5),
           hash(instanceIndex.add(uint(811))).sub(0.5),
           hash(instanceIndex.add(uint(919))).sub(0.5)
@@ -257,7 +257,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         ).mul(0.55);
 
         const personalOffset =
-          dragDir.mul(dragRadius).add(wobble);
+          dragOffsetDir.mul(dragRadius).add(wobble);
 
         const dragTargetPos =
           params.attractor.add(personalOffset);
