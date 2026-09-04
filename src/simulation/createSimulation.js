@@ -230,11 +230,34 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const normalFollow =
           mix(0.85, 0.45, personalPhase);
 
-        const personalOffset = vec3(
+ // --- Comportamiento ARRASTRADO (manteniendo click) ---
+        // Dirección aleatoria normalizada (esfera, no cubo) + radio
+        // con caída hacia el centro (más denso ahí, como una gota
+        // real de tinta/humo).
+        const dragDir = vec3(
           hash(instanceIndex.add(uint(701))).sub(0.5),
           hash(instanceIndex.add(uint(811))).sub(0.5),
           hash(instanceIndex.add(uint(919))).sub(0.5)
-        ).mul(2.6);
+        ).normalize();
+
+        const dragRadiusSeed = hash(instanceIndex.add(uint(1013)));
+        const dragRadius = dragRadiusSeed.mul(2.6);
+
+        // Oscilación suave y continua, distinta por partícula — usa
+        // la posición actual (siempre cambiando) como "reloj"
+        // implícito, así nunca se congela ni necesita un uniform de
+        // tiempo aparte.
+        const wobblePhase =
+          personalPhase.mul(37.0).add(p.length().mul(1.4));
+
+        const wobble = vec3(
+          sin(wobblePhase),
+          cos(wobblePhase.mul(1.3)),
+          sin(wobblePhase.mul(0.7))
+        ).mul(0.55);
+
+        const personalOffset =
+          dragDir.mul(dragRadius).add(wobble);
 
         const dragTargetPos =
           params.attractor.add(personalOffset);
