@@ -28,6 +28,7 @@ const CIRCLE_RADIUS_DEFAULT = 4.0;
 const COLOR_FLOW_INTERVAL = 1.4;
 
 const SPHERE_SHAPE_COUNT = 4; // esfera, diamante, cubo, pirámide
+const CIRCLE_SHAPE_COUNT = 4; // círculo, cuadrado, triángulo, estrella de David
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -294,6 +295,11 @@ async function main() {
     params.sphereShape.value = (params.sphereShape.value + 1) % SPHERE_SHAPE_COUNT;
   };
 
+  const cycleCircleShape = () => {
+    if (params.mode.value !== 2) return;
+    params.circleShape.value = (params.circleShape.value + 1) % CIRCLE_SHAPE_COUNT;
+  };
+
   const changeWindSpeed = (amount) => {
     windSpeedTarget = Math.max(
       WIND_SPEED_MIN,
@@ -338,6 +344,7 @@ async function main() {
     params.circleRadius.value = CIRCLE_RADIUS_DEFAULT;
     params.sphereShape.value = 0;
     params.sphereRotation.value = 0.0;
+    params.circleShape.value = 0;
 
     colorFlowEnabled = false;
     colorFlowTimer = 0;
@@ -382,6 +389,7 @@ async function main() {
     onExpandRadius: expandRadius,
     onCompressRadius: compressRadius,
     onCycleSphereShape: cycleSphereShape,
+    onCycleCircleShape: cycleCircleShape,
     onSlow: toggleSlow,
     onStatic: triggerStatic,
     onCrazy: triggerCrazy,
@@ -457,6 +465,10 @@ async function main() {
         cycleSphereShape();
         break;
 
+      case 'KeyY':
+        cycleCircleShape();
+        break;
+
       case 'Digit1':
         setParticleMode(0);
         break;
@@ -524,7 +536,7 @@ async function main() {
       params.windAngle.value += WIND_ROTATE_SPEED * delta;
     }
 
-        if (heldKeys.has('KeyJ')) {
+    if (heldKeys.has('KeyJ')) {
       params.sphereRotation.value -= SPHERE_ROTATE_SPEED * delta;
     }
 
