@@ -1,3 +1,4 @@
+
 import { Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 
@@ -31,6 +32,10 @@ export function createParameters() {
     // ESFERA: forma + rotación (J/K)
     sphereShape: uniform(0.0),
     sphereRotation: uniform(0.0),
+
+    // CÍRCULO: forma (Y) — 0 círculo, 1 cuadrado, 2 triángulo,
+    // 3 estrella de David
+    circleShape: uniform(0.0),
 
     // FUERZA RADIAL
     radialEnabled: uniform(0.0),
