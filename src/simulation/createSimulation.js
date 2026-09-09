@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, If, color, hash, instanceIndex, instancedArray, max, mix, step, uint, uv, vec3, vec4, sin, cos } from 'three/tsl';
+import { Fn, If, color, hash, instanceIndex, instancedArray, max, min, mix, step, uint, uv, vec3, vec4, sin, cos } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const positionBuffer = instancedArray(count, 'vec3');
@@ -93,10 +93,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         );
       });
 
-          // =====================================================
+      // =====================================================
       // ESFERA — con selector de forma (sphereShape) y rotación
-      // (sphereRotation, J/K). Se rota el punto de muestreo antes
-      // de evaluar la forma, así el mundo ve la figura girada.
       // =====================================================
       If(params.mode.greaterThan(0.5).and(params.mode.lessThan(1.5)), () => {
         const euclidLen = max(p.length(), 0.001);
@@ -111,9 +109,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const cubeDist = max(max(rx.abs(), ry.abs()), rz.abs());
         const diamondDist = rx.abs().add(ry.abs()).add(rz.abs());
 
-        // Pirámide: punta hacia +Y (arriba en pantalla), base hacia
-        // -Y. Antes usaba Z (hacia la cámara) — por eso no se veía
-        // como pirámide, la punta apuntaba directo a ti.
         const widthScale =
           params.baseRadius.sub(ry).div(params.baseRadius.mul(2.0));
 
@@ -157,8 +152,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           )
         );
       });
+
       // =====================================================
-      // CÍRCULO — anillo liso, respira con el Kick (resorte)
+      // CÍRCULO — con selector de forma (circleShape): 0 círculo,
+      // 1 cuadrado, 2 triángulo, 3 estrella de David. Mismo truco
+      // de "gauge" que la Esfera: se evalúa en el punto actual,
+      // no en una dirección aparte, así funciona para cualquier
+      // forma sin necesitar ángulos explícitos.
       // =====================================================
       If(params.mode.greaterThan(1.5).and(params.mode.lessThan(2.5)), () => {
         const xy = vec3(p.x, p.y, 0.0);
@@ -169,13 +169,36 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const organicWobble = sin(p.x.mul(3.0).add(p.y.mul(2.0)))
           .add(sin(p.x.mul(5.3).sub(p.y.mul(4.1))).mul(0.25));
 
+        const squareDist = max(p.x.abs(), p.y.abs());
+
+        // Triángulo apuntando hacia arriba: máximo de 3 funcionales
+        // lineales (normales de cada lado, separadas 120°).
+        const triUp1 = p.y.negate();
+        const triUp2 = p.x.mul(0.8660254).add(p.y.mul(0.5));
+        const triUp3 = p.x.mul(-0.8660254).add(p.y.mul(0.5));
+        const triangleDist = max(max(triUp1, triUp2), triUp3);
+
+        // Estrella de David: unión (mínimo) de un triángulo hacia
+        // arriba y uno hacia abajo.
+        const triDown1 = p.y;
+        const triDown2 = p.x.mul(-0.8660254).add(p.y.mul(-0.5));
+        const triDown3 = p.x.mul(0.8660254).add(p.y.mul(-0.5));
+        const triangleDownDist = max(max(triDown1, triDown2), triDown3);
+
+        const hexagramDist = min(triangleDist, triangleDownDist);
+
+        const cs = params.circleShape;
+        const cd01 = mix(radius, squareDist, step(0.5, cs));
+        const cd12 = mix(cd01, triangleDist, step(1.5, cs));
+        const shapeDistCircle = mix(cd12, hexagramDist, step(2.5, cs));
+
         const effectiveRadius = params.circleRadius
           .add(params.circleExpansion.mul(2.0))
           .add(organicWobble.mul(params.circleExpansion).mul(0.55));
 
         const radiusCorrection =
           radial
-            .mul(effectiveRadius.sub(radius))
+            .mul(effectiveRadius.sub(shapeDistCircle))
             .mul(18.0);
 
         const circleVelocity =
@@ -193,7 +216,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       });
 
       // =====================================================
-      // PUNTERO
+      // PUNTERO — normal (arrastre) o, manteniendo click, nube
+      // esférica pesada tipo humo/tinta.
       // =====================================================
       If(params.mode.greaterThan(2.5).and(params.mode.lessThan(3.5)), () => {
         const toPointer =
@@ -231,9 +255,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
           mix(0.85, 0.45, personalPhase);
 
         // --- Comportamiento ARRASTRADO (manteniendo click) ---
-        // Dirección aleatoria normalizada (esfera, no cubo) + radio
-        // con caída hacia el centro (más denso ahí, como una gota
-        // real de tinta/humo).
         const dragOffsetDir = vec3(
           hash(instanceIndex.add(uint(701))).sub(0.5),
           hash(instanceIndex.add(uint(811))).sub(0.5),
@@ -243,10 +264,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
         const dragRadiusSeed = hash(instanceIndex.add(uint(1013)));
         const dragRadius = dragRadiusSeed.mul(2.6);
 
-        // Oscilación suave y continua, distinta por partícula — usa
-        // la posición actual (siempre cambiando) como "reloj"
-        // implícito, así nunca se congela ni necesita un uniform de
-        // tiempo aparte.
         const wobblePhase =
           personalPhase.mul(37.0).add(p.length().mul(1.4));
 
